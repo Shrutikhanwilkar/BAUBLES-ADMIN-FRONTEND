@@ -37,21 +37,25 @@ export function AppSidebar() {
   const location = useLocation();
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border">
-      <SidebarContent>
-        <div className="px-6 py-5 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
-            B
+    <Sidebar collapsible="icon" className="border-r border-border bg-card">
+      <SidebarContent className="bg-card">
+        <div className="px-6 py-6 flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-md">
+            <Gift className="h-6 w-6 text-white" />
           </div>
           {open && (
-            <span className="font-semibold text-lg text-foreground">
-              Baubles Admin
-            </span>
+            <div className="flex flex-col">
+              <span className="font-bold text-xl text-foreground">
+                Baubles
+              </span>
+              <span className="text-sm text-muted-foreground">
+                Admin Panel
+              </span>
+            </div>
           )}
         </div>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => {
@@ -61,11 +65,15 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={isActive}
-                      className="transition-all"
+                      className={`transition-all mx-3 my-1 ${
+                        isActive
+                          ? "bg-primary text-white hover:bg-primary hover:text-white rounded-xl"
+                          : "text-muted-foreground hover:text-foreground hover:bg-transparent"
+                      }`}
                     >
                       <NavLink to={item.url}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
+                        <item.icon className="h-5 w-5" />
+                        <span className="font-medium">{item.title}</span>
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

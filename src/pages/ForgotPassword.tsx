@@ -1,48 +1,157 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { apiService } from "@/services/api_service";
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
   const [step, setStep] = useState<"email" | "otp" | "reset" | "success">("email");
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [otp, setOtp] = useState(["", "", "", ""]);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [canResend, setCanResend] = useState(false);
+  const [secondsRemaining, setSecondsRemaining] = useState(30);
 
-  const handleSendOTP = (e: React.FormEvent) => {
+  const [hasMinLength, setHasMinLength] = useState(false);
+  const [hasLowerCase, setHasLowerCase] = useState(false);
+  const [hasUpperCase, setHasUpperCase] = useState(false);
+  const [hasNumber, setHasNumber] = useState(false);
+  const [hasSpecialChar, setHasSpecialChar] = useState(false);
+  const [meetsThreeConditions, setMeetsThreeConditions] = useState(false);
+
+  useEffect(() => {
+    if (step === "otp" && !canResend) {
+      const timer = setInterval(() => {
+        setSecondsRemaining((prev) => {
+          if (prev <= 1) {
+            setCanResend(true);
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [step, canResend]);
+
+  useEffect(() => {
+    setHasMinLength(newPassword.length >= 8);
+    setHasLowerCase(/[a-z]/.test(newPassword));
+    setHasUpperCase(/[A-Z]/.test(newPassword));
+    setHasNumber(/[0-9]/.test(newPassword));
+    setHasSpecialChar(/[!@#\$%^&*(),.?":{}|<>]/.test(newPassword));
+
+    let conditionsMet = 0;
+    if (/[a-z]/.test(newPassword)) conditionsMet++;
+    if (/[A-Z]/.test(newPassword)) conditionsMet++;
+    if (/[0-9]/.test(newPassword)) conditionsMet++;
+    if (/[!@#\$%^&*(),.?":{}|<>]/.test(newPassword)) conditionsMet++;
+
+    setMeetsThreeConditions(conditionsMet >= 3);
+  }, [newPassword]);
+
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
+    if (!email) {
+      toast.error("Please enter your email");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await apiService.sendOTP({ email });
       toast.success("OTP sent to your email!");
       setStep("otp");
+      setCanResend(false);
+      setSecondsRemaining(30);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send OTP");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleVerifyOTP = (e: React.FormEvent) => {
+  const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     const otpValue = otp.join("");
-    if (otpValue.length === 6) {
+    if (otpValue.length !== 4) {
+      toast.error("Please enter complete OTP");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await apiService.verifyOTP({ email, otp: otpValue });
       toast.success("OTP verified!");
       setStep("reset");
-    } else {
-      toast.error("Please enter complete OTP");
+    } catch (error: any) {
+      toast.error(error.message || "Invalid OTP");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleResetPassword = (e: React.FormEvent) => {
+  const handleResendOTP = async () => {
+    if (!canResend || resendLoading) return;
+
+    try {
+      setResendLoading(true);
+      await apiService.resendOTP({ email });
+      toast.success("OTP sent successfully!");
+      setCanResend(false);
+      setSecondsRemaining(30);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to resend OTP");
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword === confirmPassword && newPassword.length >= 6) {
+
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+
+    if (!meetsThreeConditions) {
+      toast.error("Password must meet the requirements");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords don't match");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await apiService.forgotPassword({
+        email,
+        password: newPassword,
+        confirmPassword,
+      });
       setStep("success");
       setTimeout(() => {
         navigate("/login");
       }, 2000);
-    } else {
-      toast.error("Passwords don't match or too short");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to reset password");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -51,13 +160,24 @@ export default function ForgotPassword() {
       const newOtp = [...otp];
       newOtp[index] = value;
       setOtp(newOtp);
-      
-      if (value && index < 5) {
+
+      if (value && index < 3) {
         const nextInput = document.getElementById(`otp-${index + 1}`);
         nextInput?.focus();
       }
     }
   };
+
+  const buildRequirement = (text: string, isMet: boolean) => (
+    <div className="flex items-center gap-2 py-1">
+      <CheckCircle2
+        className={`w-4 h-4 ${isMet ? "text-green-500" : "text-gray-400"}`}
+      />
+      <span className={`text-sm ${isMet ? "text-green-500" : "text-gray-700"}`}>
+        {text}
+      </span>
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-background p-4">
@@ -74,7 +194,7 @@ export default function ForgotPassword() {
           </h1>
           <p className="text-muted-foreground">
             {step === "email" && "Enter your email to receive OTP"}
-            {step === "otp" && "Enter the 6-digit code sent to your email"}
+            {step === "otp" && "Enter the 4-digit code sent to your email"}
             {step === "reset" && "Create a new password"}
             {step === "success" && "Your password has been reset"}
           </p>
@@ -97,10 +217,11 @@ export default function ForgotPassword() {
                     placeholder="admin@baubles.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    disabled={loading}
                   />
                 </div>
-                <Button type="submit" className="w-full" size="lg">
-                  Send OTP
+                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                  {loading ? "Sending..." : "Send OTP"}
                 </Button>
               </form>
             )}
@@ -117,11 +238,28 @@ export default function ForgotPassword() {
                       value={digit}
                       onChange={(e) => handleOtpChange(index, e.target.value)}
                       className="w-12 h-12 text-center text-lg font-semibold"
+                      disabled={loading}
                     />
                   ))}
                 </div>
-                <Button type="submit" className="w-full" size="lg">
-                  Verify OTP
+                <div className="text-center">
+                  {canResend ? (
+                    <button
+                      type="button"
+                      onClick={handleResendOTP}
+                      disabled={resendLoading}
+                      className="text-primary hover:underline text-sm"
+                    >
+                      {resendLoading ? "Sending..." : "Resend Code"}
+                    </button>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Resend Code in {secondsRemaining}s
+                    </p>
+                  )}
+                </div>
+                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                  {loading ? "Verifying..." : "Verify OTP"}
                 </Button>
               </form>
             )}
@@ -130,26 +268,80 @@ export default function ForgotPassword() {
               <form onSubmit={handleResetPassword} className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="newPassword">New Password</Label>
-                  <Input
-                    id="newPassword"
-                    type="password"
-                    placeholder="••••••••"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="newPassword"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Create your new password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4 text-gray-500" />
+                      ) : (
+                        <Eye className="w-4 h-4 text-gray-500" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="border rounded-lg p-4 space-y-2">
+                  <p className="text-sm font-medium mb-3">Your password must contain:</p>
+                  {buildRequirement("At least 8 characters", hasMinLength)}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 py-1">
+                      <CheckCircle2
+                        className={`w-4 h-4 ${meetsThreeConditions ? "text-green-500" : "text-gray-400"
+                          }`}
+                      />
+                      <span
+                        className={`text-sm font-medium ${meetsThreeConditions ? "text-green-500" : "text-gray-700"
+                          }`}
+                      >
+                        At least 3 of the following:
+                      </span>
+                    </div>
+                    <div className="ml-6 space-y-1">
+                      {buildRequirement("Lower case letters (a-z)", hasLowerCase)}
+                      {buildRequirement("Upper case letters (A-Z)", hasUpperCase)}
+                      {buildRequirement("Numbers (0-9)", hasNumber)}
+                      {buildRequirement("Special characters (e.g. !@#$%^&*)", hasSpecialChar)}
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Enter your confirm password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="w-4 h-4 text-gray-500" />
+                      ) : (
+                        <Eye className="w-4 h-4 text-gray-500" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <Button type="submit" className="w-full" size="lg">
-                  Reset Password
+
+                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                  {loading ? "Updating..." : "Reset Password"}
                 </Button>
               </form>
             )}

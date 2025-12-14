@@ -1,38 +1,271 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { Camera, Save } from "lucide-react";
+import { Camera, Save, Loader2, Eye, EyeOff } from "lucide-react";
+import { apiService } from "@/services/api_service";
+import { AdminProfile as AdminProfileType } from "@/services/api_types";
+
+const ProfileSkeleton = () => (
+  <div className="max-w-4xl animate-fade-in space-y-6">
+    <div className="h-9 w-48 bg-muted/80 rounded animate-pulse"></div>
+
+    <Card className="shadow-card">
+      <CardHeader>
+        <div className="h-7 w-40 bg-muted/80 rounded animate-pulse"></div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="flex items-center gap-6">
+          <div className="relative">
+            <div className="w-24 h-24 rounded-full bg-muted/80 animate-pulse"></div>
+          </div>
+          <div className="space-y-2">
+            <div className="h-5 w-32 bg-muted/80 rounded animate-pulse"></div>
+            <div className="h-4 w-48 bg-muted/80 rounded animate-pulse"></div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <div className="h-4 w-20 bg-muted/80 rounded animate-pulse"></div>
+            <div className="h-10 w-full bg-muted/80 rounded animate-pulse"></div>
+          </div>
+          <div className="space-y-2">
+            <div className="h-4 w-20 bg-muted/80 rounded animate-pulse"></div>
+            <div className="h-10 w-full bg-muted/80 rounded animate-pulse"></div>
+          </div>
+          <div className="space-y-2">
+            <div className="h-4 w-28 bg-muted/80 rounded animate-pulse"></div>
+            <div className="h-10 w-full bg-muted/80 rounded animate-pulse"></div>
+          </div>
+        </div>
+
+        <div className="h-10 w-36 bg-muted/80 rounded animate-pulse"></div>
+      </CardContent>
+    </Card>
+
+    <Card className="shadow-card">
+      <CardHeader>
+        <div className="h-7 w-40 bg-muted/80 rounded animate-pulse"></div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <div className="h-4 w-28 bg-muted/80 rounded animate-pulse"></div>
+          <div className="h-10 w-full bg-muted/80 rounded animate-pulse"></div>
+        </div>
+        <div className="space-y-2">
+          <div className="h-4 w-32 bg-muted/80 rounded animate-pulse"></div>
+          <div className="h-10 w-full bg-muted/80 rounded animate-pulse"></div>
+        </div>
+        <div className="h-10 w-40 bg-muted/80 rounded animate-pulse"></div>
+      </CardContent>
+    </Card>
+  </div>
+);
 
 export default function AdminProfile() {
-  const [name, setName] = useState("Admin User");
-  const [email, setEmail] = useState("admin@baubles.com");
-  const [mobile, setMobile] = useState("+1 234 567 8900");
+  const [profile, setProfile] = useState<AdminProfileType | null>(null);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string>("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [isLoadingPassword, setIsLoadingPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const hasFetched = useRef(false);
 
-  const handleSaveProfile = () => {
-    toast.success("Profile updated successfully!");
-  };
+  useEffect(() => {
+    let isMounted = true;
 
-  const handleChangePassword = () => {
-    if (newPassword === confirmPassword && newPassword.length >= 6) {
-      toast.success("Password changed successfully!");
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-    } else {
-      toast.error("Passwords don't match or too short");
+    const loadProfileData = async () => {
+      if (!hasFetched.current) {
+        hasFetched.current = true;
+        if (isMounted) {
+          await fetchProfile();
+        }
+      }
+    };
+
+    loadProfileData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      setIsLoading(true);
+      const response = await apiService.getAdminProfile();
+      if (response.success) {
+        setProfile(response.data);
+        setName(response.data.name);
+        setEmail(response.data.email);
+        setMobile(response.data.mobile || "");
+        setAvatarPreview(response.data.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${response.data.name || 'admin'}`);
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to fetch profile");
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast.error("Please select a valid image file");
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image size should be less than 5MB");
+        return;
+      }
+
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const validatePassword = (password: string): string | null => {
+    if (!password) {
+      return "Please enter a password";
+    }
+
+    if (password.length < 8) {
+      return "Password must be at least 8 characters";
+    }
+
+    let conditionsMet = 0;
+
+    if (/[a-z]/.test(password)) {
+      conditionsMet++;
+    }
+
+    if (/[A-Z]/.test(password)) {
+      conditionsMet++;
+    }
+
+    if (/[0-9]/.test(password)) {
+      conditionsMet++;
+    }
+
+    if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      conditionsMet++;
+    }
+
+    if (conditionsMet < 3) {
+      return "Password must contain at least 3 of the following:\nLowercase letters, Uppercase letters, Numbers, Special characters";
+    }
+
+    return null;
+  };
+
+  const handleSaveProfile = async () => {
+    if (!name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    if (!email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
+    if (!mobile.trim()) {
+      toast.error("Mobile number is required");
+      return;
+    }
+
+    try {
+      setIsLoadingProfile(true);
+      const response = await apiService.updateProfile({
+        name: name.trim(),
+        email: email.trim(),
+        mobile: mobile.trim(),
+        avatar: avatarFile,
+      });
+      if (response.success) {
+        setProfile(response.data);
+        setAvatarFile(null);
+        if (response.data.avatar) {
+          setAvatarPreview(response.data.avatar);
+        }
+        toast.success("Profile updated successfully!");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update profile");
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    const newPasswordError = validatePassword(newPassword);
+    if (newPasswordError) {
+      toast.error(newPasswordError);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords don't match");
+      return;
+    }
+
+    try {
+      setIsLoadingPassword(true);
+      const response = await apiService.changePassword({
+        newPassword: newPassword,
+        confirmPassword: confirmPassword,
+      });
+      if (response.success) {
+        toast.success("Password changed successfully!");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to change password");
+    } finally {
+      setIsLoadingPassword(false);
+    }
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  if (isLoading) {
+    return <ProfileSkeleton />;
+  }
+
   return (
     <div className="max-w-4xl animate-fade-in space-y-6">
-      <h1 className="text-3xl font-bold">Admin Profile</h1>
+      <h1 className="text-3xl font-bold">Your Profile</h1>
 
       <Card className="shadow-card">
         <CardHeader>
@@ -42,19 +275,31 @@ export default function AdminProfile() {
           <div className="flex items-center gap-6">
             <div className="relative">
               <Avatar className="w-24 h-24">
-                <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=admin" />
-                <AvatarFallback>AD</AvatarFallback>
+                <AvatarImage src={avatarPreview} />
+                <AvatarFallback>{profile ? getInitials(profile.name) : "AD"}</AvatarFallback>
               </Avatar>
               <Button
                 size="icon"
                 className="absolute bottom-0 right-0 rounded-full h-8 w-8"
+                onClick={handleAvatarClick}
+                type="button"
               >
                 <Camera className="h-4 w-4" />
               </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="hidden"
+              />
             </div>
             <div>
-              <h3 className="font-semibold">{name}</h3>
-              <p className="text-sm text-muted-foreground">{email}</p>
+              <h3 className="font-semibold">{profile?.name}</h3>
+              <p className="text-sm text-muted-foreground">{profile?.email}</p>
+              {avatarFile && (
+                <p className="text-xs text-green-600 mt-1">New avatar selected</p>
+              )}
             </div>
           </div>
 
@@ -65,6 +310,7 @@ export default function AdminProfile() {
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                disabled={isLoadingProfile}
               />
             </div>
             <div className="space-y-2">
@@ -74,6 +320,7 @@ export default function AdminProfile() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoadingProfile}
               />
             </div>
             <div className="space-y-2">
@@ -82,13 +329,27 @@ export default function AdminProfile() {
                 id="mobile"
                 value={mobile}
                 onChange={(e) => setMobile(e.target.value)}
+                disabled={isLoadingProfile}
               />
             </div>
           </div>
 
-          <Button onClick={handleSaveProfile} className="w-full md:w-auto">
-            <Save className="mr-2 h-4 w-4" />
-            Save Changes
+          <Button
+            onClick={handleSaveProfile}
+            className="w-full md:w-auto"
+            disabled={isLoadingProfile}
+          >
+            {isLoadingProfile ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Save Changes
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
@@ -99,34 +360,75 @@ export default function AdminProfile() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="currentPassword">Current Password</Label>
-            <Input
-              id="currentPassword"
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
             <Label htmlFor="newPassword">New Password</Label>
-            <Input
-              id="newPassword"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
+            <div className="relative">
+              <Input
+                id="newPassword"
+                type={showNewPassword ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                disabled={isLoadingPassword}
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                disabled={isLoadingPassword}
+              >
+                {showNewPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Must be at least 8 characters and contain 3 of: lowercase, uppercase, numbers, special characters
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirm Password</Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
+            <div className="relative">
+              <Input
+                id="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={isLoadingPassword}
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                disabled={isLoadingPassword}
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </div>
-          <Button onClick={handleChangePassword} className="w-full md:w-auto">
-            Change Password
+          <Button
+            onClick={handleChangePassword}
+            className="w-full md:w-auto"
+            disabled={isLoadingPassword}
+          >
+            {isLoadingPassword ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Changing...
+              </>
+            ) : (
+              "Change Password"
+            )}
           </Button>
         </CardContent>
       </Card>

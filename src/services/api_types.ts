@@ -491,6 +491,7 @@ export interface AdminProfile {
     updatedAt: string;
     __v?: number;
     mobile?: string;
+    countryCode?: string;
 }
 
 export interface GetAdminProfileResponse {
@@ -503,6 +504,7 @@ export interface UpdateProfileRequest {
     name: string;
     email: string;
     mobile: string;
+    countryCode: string;
     avatar?: File | null;
 }
 
@@ -540,6 +542,8 @@ export interface Contact {
     type?: ContactType;
     isResolved: boolean;
     solution?: string;
+    solutionImages?: string[];
+    images?: string[];
     createdAt: string;
     updatedAt: string;
     __v?: number;
@@ -718,12 +722,15 @@ export interface AppVersion {
     releaseDate: string;
     createdAt: string;
     updatedAt: string;
+    remarks?: string;
+    notes?: string;
     __v?: number;
 }
 
 export interface UpdateAppVersionRequest {
     androidVersion: string;
     iosVersion: string;
+    notes: string;
 }
 
 export interface UpdateAppVersionResponse {
@@ -769,6 +776,143 @@ export interface GetBroadcastHistoryResponse {
     message: string;
     data: {
         total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
         data: BroadcastHistory[];
     };
+}
+
+export interface ReportsByStateParams {
+    state: string;
+}
+
+export interface ReportsByStateResponse {
+    success: boolean;
+    message: string;
+    data: Array<{
+        state: string;
+        categories: {
+            [categoryName: string]: number;
+        };
+    }>;
+}
+
+export interface ReportCategoryDetailParams {
+    page?: number;
+    limit?: number;
+    search?: string;
+    state?: string;
+    fromDate?: string;
+    toDate?: string;
+}
+
+export interface ReportChildData {
+    _id: string;
+    createdAt: string;
+    updatedAt: string;
+    statusCategory: {
+        _id: string;
+        name: string;
+        color: string;
+        description: string;
+    };
+    children: {
+        _id: string;
+        parentId: string;
+        avatar?: string;
+        firstName: string;
+        dob: string;
+        state: string;
+        gender: string;
+        createdAt: string;
+        updatedAt: string;
+    };
+    parent: {
+        email: string;
+        name: string;
+    };
+}
+
+export interface GetReportCategoryDetailResponse {
+    success: boolean;
+    message: string;
+    data: {
+        data: ReportChildData[];
+        pagination: {
+            total: number;
+            page: number;
+            limit: number;
+            totalPages: number;
+        };
+    };
+}
+
+export interface ReportDashboardParams {
+    type: 'behaviour' | 'popular' | 'state';
+}
+
+export interface BehaviourReportData {
+    totalChildren: number;
+    totalNice: number;
+    totalNaughty: number;
+    data: {
+        topNice: Array<{
+            firstName: string;
+            count: number;
+            childId: string;
+            statusCategoryId: string;
+        }>;
+        topNaughty: Array<{
+            firstName: string;
+            count: number;
+            childId: string;
+            statusCategoryId: string;
+        }>;
+    };
+}
+
+export interface PopularReportData {
+    totalChildren: number;
+    totalNice: number;
+    totalNaughty: number;
+    data: {
+        top20BoysName: Array<{
+            count: number;
+            firstName: string;
+        }>;
+        top20GirlsName: Array<{
+            count: number;
+            firstName: string;
+        }>;
+    };
+}
+
+export interface StateReportData {
+    totalChildren: number;
+    totalNice: number;
+    totalNaughty: number;
+    data: Array<{
+        nice: number;
+        naughty: number;
+        state: string;
+    }>;
+}
+
+export interface GetBehaviourReportResponse {
+    success: boolean;
+    message: string;
+    data: BehaviourReportData;
+}
+
+export interface GetPopularReportResponse {
+    success: boolean;
+    message: string;
+    data: PopularReportData;
+}
+
+export interface GetStateReportResponse {
+    success: boolean;
+    message: string;
+    data: StateReportData;
 }

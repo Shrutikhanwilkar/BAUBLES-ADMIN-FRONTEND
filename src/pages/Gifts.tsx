@@ -114,23 +114,9 @@ export default function Gifts() {
   const isSuperAdmin = userRole === 'SUPERADMIN';
 
   useEffect(() => {
-    let isMounted = true;
-
-    const loadData = async () => {
-      if (!hasFetched.current) {
-        hasFetched.current = true;
-        if (isMounted) {
-          await Promise.all([fetchGifts(), fetchPackages()]);
-        }
-      }
-    };
-
-    loadData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  fetchGifts();
+  fetchPackages();
+}, []);
 
   const fetchGifts = async () => {
     try {

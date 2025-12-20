@@ -8,6 +8,48 @@ import { toast } from "sonner";
 import { Camera, Save, Loader2, Eye, EyeOff } from "lucide-react";
 import { apiService } from "@/services/api_service";
 import { AdminProfile as AdminProfileType } from "@/services/api_types";
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
+import { parsePhoneNumber } from 'libphonenumber-js';
+
+const COUNTRY_PHONE_LENGTHS: { [key: string]: number } = {
+  'IN': 10,
+  'US': 10,
+  'GB': 10,
+  'CA': 10,
+  'AU': 9,
+  'NZ': 9,
+  'DE': 11,
+  'FR': 9,
+  'IT': 10,
+  'ES': 9,
+  'BR': 11,
+  'MX': 10,
+  'JP': 10,
+  'CN': 11,
+  'KR': 10,
+  'RU': 10,
+  'ZA': 9,
+  'AE': 9,
+  'SA': 9,
+  'EG': 10,
+  'NG': 10,
+  'KE': 9,
+  'PK': 10,
+  'BD': 10,
+  'ID': 11,
+  'MY': 10,
+  'SG': 8,
+  'TH': 9,
+  'VN': 9,
+  'PH': 10,
+  'TR': 10,
+  'AR': 10,
+  'CL': 9,
+  'CO': 10,
+  'PE': 9,
+  'VE': 10,
+};
 
 const ProfileSkeleton = () => (
   <div className="max-w-4xl animate-fade-in space-y-6">
@@ -70,7 +112,9 @@ export default function AdminProfile() {
   const [profile, setProfile] = useState<AdminProfileType | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [mobile, setMobile] = useState("");
+  const [mobile, setMobile] = useState<string>("");
+  const [countryCode, setCountryCode] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState<string>("IN");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>("");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -88,7 +132,7 @@ export default function AdminProfile() {
   useEffect(() => {
     let isMounted = true;
 
-    const loadProfileData = async () => {
+    const loadProfile = async () => {
       if (!hasFetched.current) {
         hasFetched.current = true;
         if (isMounted) {
@@ -97,7 +141,7 @@ export default function AdminProfile() {
       }
     };
 
-    loadProfileData();
+    loadProfile();
 
     return () => {
       isMounted = false;
@@ -113,6 +157,7 @@ export default function AdminProfile() {
         setName(response.data.name);
         setEmail(response.data.email);
         setMobile(response.data.mobile || "");
+        setCountryCode(response.data.countryCode || "");
         setAvatarPreview(response.data.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${response.data.name || 'admin'}`);
       }
     } catch (error: any) {
@@ -145,6 +190,38 @@ export default function AdminProfile() {
         setAvatarPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const getMaxDigitsForCountry = (country: string): number => {
+    return COUNTRY_PHONE_LENGTHS[country] || 15;
+  };
+
+  const handlePhoneChange = (value: string | undefined) => {
+    if (value) {
+      try {
+        const phoneNumber = parsePhoneNumber(value);
+        if (phoneNumber) {
+          const country = phoneNumber.country || 'IN';
+          const nationalNumber = phoneNumber.nationalNumber;
+          const maxDigits = getMaxDigitsForCountry(country);
+
+          if (nationalNumber.length > maxDigits) {
+            return;
+          }
+
+          setMobile(value);
+          setCountryCode(phoneNumber.countryCallingCode);
+          setSelectedCountry(country);
+        } else {
+          setMobile(value);
+        }
+      } catch (error) {
+        setMobile(value);
+      }
+    } else {
+      setMobile("");
+      setCountryCode("");
     }
   };
 
@@ -191,8 +268,25 @@ export default function AdminProfile() {
       toast.error("Email is required");
       return;
     }
-    if (!mobile.trim()) {
+    if (!mobile || !mobile.trim()) {
       toast.error("Mobile number is required");
+      return;
+    }
+
+    try {
+      const phoneNumber = parsePhoneNumber(mobile);
+      if (phoneNumber) {
+        const country = phoneNumber.country || 'IN';
+        const nationalNumber = phoneNumber.nationalNumber;
+        const maxDigits = getMaxDigitsForCountry(country);
+
+        if (nationalNumber.length !== maxDigits) {
+          toast.error(`Phone number must be exactly ${maxDigits} digits for ${country}`);
+          return;
+        }
+      }
+    } catch (error) {
+      toast.error("Please enter a valid phone number");
       return;
     }
 
@@ -202,6 +296,7 @@ export default function AdminProfile() {
         name: name.trim(),
         email: email.trim(),
         mobile: mobile.trim(),
+        countryCode: countryCode,
         avatar: avatarFile,
       });
       if (response.success) {
@@ -265,6 +360,58 @@ export default function AdminProfile() {
 
   return (
     <div className="max-w-4xl animate-fade-in space-y-6">
+      <style>{`
+        .PhoneInput {
+          display: flex;
+          align-items: center;
+        }
+        .PhoneInputInput {
+          flex: 1;
+          min-width: 0;
+          background: transparent !important;
+          border: none !important;
+          outline: none !important;
+          color: inherit !important;
+        }
+        .PhoneInputCountry {
+          margin-right: 0.5rem;
+        }
+        .PhoneInputCountrySelect {
+          background: hsl(var(--background)) !important;
+          border: none !important;
+          color: hsl(var(--foreground)) !important;
+          cursor: pointer;
+        }
+        .PhoneInputCountrySelect:focus {
+          outline: none !important;
+        }
+        .PhoneInputCountrySelectArrow {
+          color: hsl(var(--foreground)) !important;
+          opacity: 0.5;
+        }
+        .PhoneInputCountryIcon {
+          width: 1.25rem !important;
+          height: 1.25rem !important;
+          border: none !important;
+          outline: none !important;
+          box-shadow: none !important;
+        }
+        .PhoneInputCountryIcon img {
+          border: none !important;
+          outline: none !important;
+          box-shadow: none !important;
+        }
+        .PhoneInputCountryIconImg {
+          border: none !important;
+          outline: none !important;
+          box-shadow: none !important;
+        }
+        select.PhoneInputCountrySelect option {
+          background: hsl(var(--background)) !important;
+          color: hsl(var(--foreground)) !important;
+        }
+      `}</style>
+
       <h1 className="text-3xl font-bold">Your Profile</h1>
 
       <Card className="shadow-card">
@@ -323,14 +470,17 @@ export default function AdminProfile() {
                 disabled={isLoadingProfile}
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <Label htmlFor="mobile">Mobile Number</Label>
-              <Input
-                id="mobile"
-                value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
-                disabled={isLoadingProfile}
-              />
+              <div className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                <PhoneInput
+                  international
+                  defaultCountry="IN"
+                  value={mobile}
+                  onChange={handlePhoneChange}
+                  disabled={isLoadingProfile}
+                />
+              </div>
             </div>
           </div>
 

@@ -78,25 +78,10 @@ export default function MusicLibrary() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  const hasFetched = useRef(false);
+  const isInitialMount = useRef(true);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const loadData = async () => {
-      if (!hasFetched.current) {
-        hasFetched.current = true;
-        if (isMounted) {
-          await fetchData();
-        }
-      }
-    };
-
-    loadData();
-
-    return () => {
-      isMounted = false;
-    };
+    fetchData();
   }, []);
 
   const fetchData = async () => {
@@ -159,9 +144,11 @@ export default function MusicLibrary() {
   };
 
   useEffect(() => {
-    if (hasFetched.current) {
-      fetchAudioBooks();
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
     }
+    fetchAudioBooks();
   }, [currentPage, pageLimit]);
 
   const handleSearch = () => {
@@ -425,19 +412,19 @@ export default function MusicLibrary() {
                     <tr key={book._id} className="border-b hover:bg-muted/50">
                       <td className="px-4 py-3 font-medium">{book.title}</td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          {book.isFree ? (
-                            <>
-                              <Gift className="h-4 w-4 text-blue-600" />
-                              <span className="text-sm text-blue-600 font-medium">Free</span>
-                            </>
-                          ) : (
-                            <>
-                              <DollarSign className="h-4 w-4 text-green-600" />
-                              <span className="text-sm text-green-600 font-medium">Paid</span>
-                            </>
-                          )}
-                        </div>
+                        {book.isFree ? (
+                          <img
+                            src="/free_icon.png"
+                            alt="Free"
+                            className="h-8 w-8"
+                          />
+                        ) : (
+                          <img
+                            src="/paid_icon.png"
+                            alt="Paid"
+                            className="h-8 w-8"
+                          />
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <Badge style={{ backgroundColor: book.statusCategory.color }}>
@@ -574,7 +561,6 @@ export default function MusicLibrary() {
                       <div className="w-3 h-3 rounded-full bg-blue-500"></div>
                     )}
                   </div>
-                  <Gift className="h-5 w-5 text-blue-600" />
                   <span className="font-medium">Free</span>
                 </div>
                 <div
@@ -592,7 +578,6 @@ export default function MusicLibrary() {
                       <div className="w-3 h-3 rounded-full bg-green-500"></div>
                     )}
                   </div>
-                  <DollarSign className="h-5 w-5 text-green-600" />
                   <span className="font-medium">Paid</span>
                 </div>
               </div>

@@ -9,6 +9,13 @@ import { Send, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { apiService } from "@/services/api_service";
 import { BroadcastHistory, ApiError } from "@/services/api_types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function Notifications() {
   const [title, setTitle] = useState("");
@@ -16,35 +23,41 @@ export default function Notifications() {
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<BroadcastHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageLimit, setPageLimit] = useState(10);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const hasFetched = useRef(false);
 
+  const isInitialMount = useRef(true);
+
   useEffect(() => {
-    let isMounted = true;
-
-    const loadData = async () => {
-      if (!hasFetched.current) {
-        hasFetched.current = true;
-        if (isMounted) {
-          await fetchBroadcastHistory();
-        }
-      }
-    };
-
-    loadData();
-
-    return () => {
-      isMounted = false;
-    };
+    fetchBroadcastHistory();
   }, []);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    fetchBroadcastHistory();
+  }, [page, pageLimit]);
 
   const fetchBroadcastHistory = async () => {
     try {
       setHistoryLoading(true);
+      const params = {
+        page,
+        limit: pageLimit === -1 ? 1000 : pageLimit,
+      };
+
       const response = await apiService.getBroadcastHistory();
 
       if (response.success) {
         setHistory(response.data.data || []);
+        setTotalRecords(response.data.total || 0);
+        setTotalPages(response.data.totalPages || 1);
       }
     } catch (error) {
       const apiError = error as ApiError;
@@ -52,6 +65,12 @@ export default function Notifications() {
     } finally {
       setHistoryLoading(false);
     }
+  };
+
+  const handleLimitChange = (value: string) => {
+    const newLimit = value === "all" ? -1 : parseInt(value);
+    setPageLimit(newLimit);
+    setPage(1);
   };
 
   const handleSend = async () => {
@@ -77,6 +96,7 @@ export default function Notifications() {
         toast.success(`Broadcast sent successfully to ${response.data.users} users!`);
         setTitle("");
         setMessage("");
+        setPage(1);
         await fetchBroadcastHistory();
       }
     } catch (error) {
@@ -106,6 +126,15 @@ export default function Notifications() {
     } else {
       return date.toLocaleDateString();
     }
+  };
+
+  const getDisplayRange = () => {
+    if (pageLimit === -1) {
+      return `Showing all ${totalRecords} entries`;
+    }
+    const start = (page - 1) * pageLimit + 1;
+    const end = Math.min(page * pageLimit, totalRecords);
+    return `Showing ${start}-${end} of ${totalRecords} entries`;
   };
 
   return (
@@ -189,41 +218,69 @@ export default function Notifications() {
           ) : history.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No broadcast history available</div>
           ) : (
-            <div className="space-y-4">
-              {history.map((broadcast) => (
-                <Card key={broadcast._id} className="bg-muted/30">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <Bell className="h-5 w-5 text-primary mt-1" />
-                      <div className="flex-1">
-                        {broadcast.title && (
-                          <p className="font-semibold mb-1">{broadcast.title}</p>
-                        )}
-                        {broadcast.body && (
-                          <p className="text-sm text-muted-foreground mb-2">{broadcast.body}</p>
-                        )}
-                        {!broadcast.title && !broadcast.body && (
-                          <p className="text-sm text-muted-foreground italic mb-2">No content available</p>
-                        )}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {broadcast.type && (
-                            <Badge variant="secondary" className="capitalize">
-                              {broadcast.type}
-                            </Badge>
+            <>
+              <div className="space-y-4">
+                {history.map((broadcast) => (
+                  <Card key={broadcast._id} className="bg-muted/30">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <Bell className="h-5 w-5 text-primary mt-1" />
+                        <div className="flex-1">
+                          {broadcast.title && (
+                            <p className="font-semibold mb-1">{broadcast.title}</p>
                           )}
-                          <span className="text-xs text-muted-foreground">
-                            {formatDate(broadcast.createdAt)}
-                          </span>
-                          <Badge variant="outline">
-                            {broadcast.activeUserCount} {broadcast.activeUserCount === 1 ? 'user' : 'users'}
-                          </Badge>
+                          {broadcast.body && (
+                            <p className="text-sm text-muted-foreground mb-2">{broadcast.body}</p>
+                          )}
+                          {!broadcast.title && !broadcast.body && (
+                            <p className="text-sm text-muted-foreground italic mb-2">No content available</p>
+                          )}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {broadcast.type && (
+                              <Badge variant="secondary" className="capitalize">
+                                {broadcast.type}
+                              </Badge>
+                            )}
+                            <span className="text-xs text-muted-foreground">
+                              {formatDate(broadcast.createdAt)}
+                            </span>
+                            <Badge variant="outline">
+                              {broadcast.activeUserCount} {broadcast.activeUserCount === 1 ? 'user' : 'users'}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {!historyLoading && history.length > 0 && (
+                <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    {getDisplayRange()}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Show</span>
+                    <Select
+                      value={pageLimit === -1 ? "all" : pageLimit.toString()}
+                      onValueChange={handleLimitChange}
+                    >
+                      <SelectTrigger className="w-[100px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="all">All</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-muted-foreground">entries</span>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

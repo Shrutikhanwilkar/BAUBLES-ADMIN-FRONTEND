@@ -18,27 +18,24 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
 import { apiService } from "@/services/api_service";
 import { AdminProfile } from "@/services/api_types";
 
 export function Header() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [isDark, setIsDark] = useState(false);
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const [profile, setProfile] = useState<AdminProfile | null>(null);
+  const hasFetched = useRef(false);
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  useEffect(() => {
-    if (location.pathname === "/profile") {
+    if (!hasFetched.current) {
+      hasFetched.current = true;
       fetchProfile();
     }
-  }, [location.pathname]);
+  }, []);
 
   const fetchProfile = async () => {
     try {

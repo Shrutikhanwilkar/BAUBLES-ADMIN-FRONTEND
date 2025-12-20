@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { apiService } from "@/services/api_service";
 import { ApiError, AppVersion } from "@/services/api_types";
 
@@ -61,6 +62,7 @@ export default function VersionControl() {
 
     const [androidVersion, setAndroidVersion] = useState("");
     const [iosVersion, setIosVersion] = useState("");
+    const [remarks, setRemarks] = useState("");
 
     const hasFetched = useRef(false);
 
@@ -102,6 +104,7 @@ export default function VersionControl() {
         if (versionData) {
             setAndroidVersion(versionData.androidVersion);
             setIosVersion(versionData.iosVersion);
+            setRemarks(versionData.remarks || versionData.notes || "");
         }
         setIsDialogOpen(true);
     };
@@ -117,12 +120,18 @@ export default function VersionControl() {
             return;
         }
 
+        if (!remarks.trim()) {
+            toast.error("Remarks is required");
+            return;
+        }
+
         setIsSaving(true);
 
         try {
             const response = await apiService.updateAppVersion({
                 androidVersion: androidVersion,
                 iosVersion: iosVersion,
+                notes: remarks,
             });
 
             if (response.success) {
@@ -195,6 +204,17 @@ export default function VersionControl() {
                                     </div>
                                 </div>
 
+                                {(versionData.remarks || versionData.notes) && (
+                                    <div className="mt-6 pt-6 border-t border-gray-200">
+                                        <div>
+                                            <p className="text-sm text-muted-foreground mb-2">Remarks</p>
+                                            <p className="font-medium text-gray-700">
+                                                {versionData.remarks || versionData.notes}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="mt-6 pt-6 border-t border-gray-200">
                                     <div className="grid gap-4 md:grid-cols-2">
                                         <div>
@@ -250,6 +270,17 @@ export default function VersionControl() {
                                 onChange={(e) => setIosVersion(e.target.value)}
                                 placeholder="e.g., 1.0.0"
                                 disabled={isSaving}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="remarks">Remarks</Label>
+                            <Textarea
+                                id="remarks"
+                                value={remarks}
+                                onChange={(e) => setRemarks(e.target.value)}
+                                placeholder="What changes were made in this version?"
+                                disabled={isSaving}
+                                rows={4}
                             />
                         </div>
                     </div>

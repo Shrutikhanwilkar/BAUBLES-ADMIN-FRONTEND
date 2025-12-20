@@ -78,4 +78,9 @@ export const API_ENDPOINTS = {
     BROADCAST: '/admin/broadcast/send',
     HISTORY: '/admin/broadcast/history',
   },
+  REPORTS: {
+    LIST_BY_STATE: '/admin/reports/list-by-state',
+    CATEGORY_DETAIL: (categoryId: string) => `/admin/reports/category/${categoryId}`,
+    DASHBOARD: '/admin/reports/dashbaord',
+  },
 };

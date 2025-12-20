@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { apiService } from "@/services/api_service";
 import { DashboardStats } from "@/services/api_types";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { toast } from "sonner";
 
 const getYouTubeEmbedUrl = (url: string) => {
@@ -33,15 +34,23 @@ const STATE_COLORS = [
 ];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [videoUrl, setVideoUrl] = useState<string>("");
+  const [originalUrl, setOriginalUrl] = useState<string>("");
   const [inputUrl, setInputUrl] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [viewMode, setViewMode] = useState<"chart" | "pie">("chart");
+  const [statePercentageData, setStatePercentageData] = useState<any[]>([]);
+  const [stateLoading, setStateLoading] = useState(true);
+  const [avgNice, setAvgNice] = useState(0);
+  const [avgNaughty, setAvgNaughty] = useState(0);
 
   useEffect(() => {
     fetchDashboardStats();
+    fetchStateReport();
   }, []);
 
   const fetchDashboardStats = async () => {
@@ -54,6 +63,7 @@ export default function Dashboard() {
           const embedUrl = getYouTubeEmbedUrl(response.data.dashboardVideo.videoFile);
           if (embedUrl) {
             setVideoUrl(embedUrl);
+            setOriginalUrl(response.data.dashboardVideo.videoFile);
           }
         }
       }
@@ -61,6 +71,41 @@ export default function Dashboard() {
       toast.error(error.message || "Failed to fetch dashboard stats");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchStateReport = async () => {
+    try {
+      setStateLoading(true);
+      const response = await apiService.getStateReport();
+      if (response.success) {
+        const stateData = response.data.data.map((state) => {
+          const total = state.nice + state.naughty;
+          const nicePercent = total > 0 ? Math.round((state.nice / total) * 100) : 0;
+          const naughtyPercent = total > 0 ? Math.round((state.naughty / total) * 100) : 0;
+
+          return {
+            state: state.state,
+            nice: nicePercent,
+            naughty: naughtyPercent,
+          };
+        });
+
+        setStatePercentageData(stateData);
+
+        const totalNice = response.data.data.reduce((sum, state) => sum + state.nice, 0);
+        const totalNaughty = response.data.data.reduce((sum, state) => sum + state.naughty, 0);
+        const total = totalNice + totalNaughty;
+
+        if (total > 0) {
+          setAvgNice(Math.round((totalNice / total) * 100));
+          setAvgNaughty(Math.round((totalNaughty / total) * 100));
+        }
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to fetch state report");
+    } finally {
+      setStateLoading(false);
     }
   };
 
@@ -84,6 +129,7 @@ export default function Dashboard() {
 
       if (response.success) {
         setVideoUrl(embedUrl);
+        setOriginalUrl(inputUrl);
         setInputUrl("");
         setIsDialogOpen(false);
         toast.success("Dashboard video updated successfully");
@@ -96,7 +142,12 @@ export default function Dashboard() {
   };
 
   const handleOpenDialog = () => {
+    setInputUrl(originalUrl);
     setIsDialogOpen(true);
+  };
+
+  const handleCardClick = (route: string) => {
+    navigate(route);
   };
 
   const statsCards = [
@@ -106,6 +157,7 @@ export default function Dashboard() {
       icon: Users,
       color: "text-primary",
       bgColor: "bg-primary/10",
+      route: "/users",
     },
     {
       title: "Total Children",
@@ -113,6 +165,7 @@ export default function Dashboard() {
       icon: Baby,
       color: "text-blue-600",
       bgColor: "bg-blue-600/10",
+      route: "/users",
     },
     {
       title: "Music Library",
@@ -120,6 +173,7 @@ export default function Dashboard() {
       icon: BookAudio,
       color: "text-purple-600",
       bgColor: "bg-purple-600/10",
+      route: "/musiclibrary",
     },
     {
       title: "Total Gifts",
@@ -127,6 +181,7 @@ export default function Dashboard() {
       icon: Gift,
       color: "text-green-600",
       bgColor: "bg-green-600/10",
+      route: "/gifts",
     },
   ];
 
@@ -155,6 +210,11 @@ export default function Dashboard() {
     },
   ];
 
+  const pieData = [
+    { name: "Naughty", value: avgNaughty, color: "#F44336" },
+    { name: "Nice", value: avgNice, color: "#4CAF50" },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -170,7 +230,8 @@ export default function Dashboard() {
         {statsCards.map((stat, index) => (
           <Card
             key={index}
-            className="hover-scale shadow-card hover:shadow-elevated transition-all"
+            className="hover-scale shadow-card hover:shadow-elevated transition-all cursor-pointer"
+            onClick={() => handleCardClick(stat.route)}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -310,6 +371,144 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      {statePercentageData.length > 0 && (
+        <Card className="shadow-card">
+          <CardContent className="p-6">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Behaviour Distribution Across States</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setViewMode("chart")}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === "chart" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
+                      }`}
+                  >
+                    Bar Chart
+                  </button>
+                  <button
+                    onClick={() => setViewMode("pie")}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === "pie" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
+                      }`}
+                  >
+                    Overview
+                  </button>
+                </div>
+              </div>
+
+              {viewMode === "chart" ? (
+                <>
+                  <ResponsiveContainer width="100%" height={450}>
+                    <BarChart data={statePercentageData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="state"
+                        angle={-45}
+                        textAnchor="end"
+                        height={115}
+                        style={{ fontSize: '11px' }}
+                      />
+                      <YAxis label={{ value: 'Percentage (%)', angle: -90, position: 'insideLeft' }} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#fff',
+                          border: '1px solid #f3f4f6',
+                          borderRadius: '8px',
+                        }}
+                        formatter={(value) => `${value}%`}
+                      />
+                      <Legend />
+                      <Bar dataKey="naughty" fill="#F44336" radius={[8, 8, 0, 0]} name="Naughty %" />
+                      <Bar dataKey="nice" fill="#4CAF50" radius={[8, 8, 0, 0]} name="Nice %" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div>
+                    <h4 className="text-sm font-semibold mb-3">Overall Distribution</h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, value }) => `${name}: ${value}%`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value) => `${value}%`}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-semibold mb-3">Statistics Summary</h4>
+                    <div className="space-y-3">
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Best Performing State</span>
+                            <span className="font-semibold">
+                              {statePercentageData.reduce((max, state) => state.nice > max.nice ? state : max).state}
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Needs Attention</span>
+                            <span className="font-semibold">
+                              {statePercentageData.reduce((max, state) => state.naughty > max.naughty ? state : max).state}
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Total States Analyzed</span>
+                            <span className="font-semibold">{statePercentageData.length}</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {statePercentageData.map((state) => (
+                  <Card key={state.state}>
+                    <CardContent className="p-4">
+                      <h4 className="font-semibold mb-2 text-sm">{state.state}</h4>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-green-600">Nice</span>
+                          <span className="font-bold">{state.nice}%</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-red-600">Naughty</span>
+                          <span className="font-bold">{state.naughty}%</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
@@ -331,6 +530,11 @@ export default function Dashboard() {
                 className="w-full"
                 disabled={isSaving}
               />
+              {originalUrl && (
+                <p className="text-xs text-muted-foreground">
+                  Current URL: {originalUrl}
+                </p>
+              )}
             </div>
             <Button
               onClick={handleUpdateVideo}

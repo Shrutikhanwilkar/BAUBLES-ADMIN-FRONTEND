@@ -76,6 +76,7 @@ export default function ReportCategoryDetail() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const hasFetched = useRef(false);
@@ -140,52 +141,54 @@ export default function ReportCategoryDetail() {
   };
 
   const fetchChildren = async () => {
+    if (!categoryId) return;
+
     try {
       setLoading(true);
 
-      const dummyChildren: Child[] = Array.from({ length: 15 }, (_, i) => ({
-        _id: `child-${i + 1}`,
-        firstName: `Child ${i + 1}`,
-        avatar: undefined,
-        age: Math.floor(Math.random() * 10) + 3,
-        state: STATES[Math.floor(Math.random() * (STATES.length - 1)) + 1],
-        createdAt: new Date(2024, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1).toISOString(),
-        parentName: `Parent ${i + 1}`,
-        parentEmail: `parent${i + 1}@example.com`,
-        statusCategory: {
-          name: category?.name || "No Status",
-          color: category?.color || "#999",
-        }
-      }));
-
-      let filteredChildren = dummyChildren;
+      const params: any = {
+        page,
+        limit: 10,
+      };
 
       if (searchQuery) {
-        filteredChildren = filteredChildren.filter(child =>
-          child.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          child.parentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          child.parentEmail.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        params.search = searchQuery;
       }
 
       if (selectedState !== "All States") {
-        filteredChildren = filteredChildren.filter(child => child.state === selectedState);
+        params.state = selectedState;
       }
 
       if (fromDate) {
-        filteredChildren = filteredChildren.filter(child =>
-          new Date(child.createdAt) >= fromDate
-        );
+        params.fromDate = fromDate.toISOString();
       }
 
       if (toDate) {
-        filteredChildren = filteredChildren.filter(child =>
-          new Date(child.createdAt) <= toDate
-        );
+        params.toDate = toDate.toISOString();
       }
 
-      setChildren(filteredChildren);
-      setTotalPages(Math.ceil(filteredChildren.length / 10));
+      const response = await apiService.getReportCategoryDetail(categoryId, params);
+
+      if (response.success) {
+        const formattedChildren: Child[] = response.data.data.map((item) => ({
+          _id: item.children._id,
+          firstName: item.children.firstName,
+          avatar: item.children.avatar,
+          dob: item.children.dob,
+          state: item.children.state,
+          createdAt: item.children.createdAt,
+          parentName: item.parent.name,
+          parentEmail: item.parent.email,
+          statusCategory: {
+            name: item.statusCategory.name,
+            color: item.statusCategory.color,
+          },
+        }));
+
+        setChildren(formattedChildren);
+        setTotalPages(response.data.pagination.totalPages);
+        setTotalCount(response.data.pagination.total);
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to fetch children");
     } finally {
@@ -220,7 +223,7 @@ export default function ReportCategoryDetail() {
       csvRows.push(["Child Name", "Parent Name", "Parent Email", "Age", "Location", "Status", "Registered Date"]);
 
       children.forEach(child => {
-        const age = child.age || calculateAge(child.dob) || "N/A";
+        const age = calculateAge(child.dob) || "N/A";
         const status = child.statusCategory?.name || "No Status";
         csvRows.push([
           child.firstName,
@@ -269,7 +272,7 @@ export default function ReportCategoryDetail() {
       const tableData: any[] = [];
 
       children.forEach(child => {
-        const age = child.age || calculateAge(child.dob) || "N/A";
+        const age = calculateAge(child.dob) || "N/A";
         const status = child.statusCategory?.name || "No Status";
 
         tableData.push([
@@ -417,7 +420,7 @@ export default function ReportCategoryDetail() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Baby className="h-5 w-5" />
-            Children List ({children.length})
+            Children List ({totalCount})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -431,7 +434,7 @@ export default function ReportCategoryDetail() {
             <>
               <div className="space-y-2">
                 {children.map((child) => {
-                  const age = child.age || calculateAge(child.dob);
+                  const age = calculateAge(child.dob);
                   const status = child.statusCategory?.name || "No Status";
                   const statusColor = child.statusCategory?.color || "#999";
                   return (

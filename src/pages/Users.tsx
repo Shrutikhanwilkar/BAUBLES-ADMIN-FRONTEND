@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, Users, Baby, MapPin, Phone, Download, FileText, FileSpreadsheet, Loader2, UserX, UserCheck } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Collapsible,
   CollapsibleContent,
@@ -52,6 +53,7 @@ export default function UsersPage() {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageLimit, setPageLimit] = useState(10);
@@ -60,44 +62,27 @@ export default function UsersPage() {
   const [exporting, setExporting] = useState(false);
   const [updating, setUpdating] = useState(false);
 
-  const hasFetched = useRef(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const isInitialMount = useRef(true);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const loadUsers = async () => {
-      if (!hasFetched.current) {
-        hasFetched.current = true;
-        if (isMounted) {
-          await fetchUsers();
-        }
-      }
-    };
-
-    loadUsers();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (hasFetched.current) {
-      fetchUsers();
-    }
+    fetchUsers();
   }, [page, statusFilter, pageLimit]);
 
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      if (hasFetched.current) {
-        setPage(1);
-        fetchUsers();
-      }
+      setPage(1);
+      setSelectedUserIds([]);
+      fetchUsers();
     }, 500);
 
     return () => {
@@ -164,6 +149,24 @@ export default function UsersPage() {
     }
   };
 
+  const handleSelectAll = () => {
+    if (selectedUserIds.length === users.length) {
+      setSelectedUserIds([]);
+    } else {
+      setSelectedUserIds(users.map(user => user._id));
+    }
+  };
+
+  const handleSelectUser = (userId: string) => {
+    setSelectedUserIds(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
+  };
+
   const calculateAge = (dob?: string) => {
     if (!dob) return null;
     const birthDate = new Date(dob);
@@ -180,36 +183,44 @@ export default function UsersPage() {
     try {
       setExporting(true);
 
-      const allUsers: UserData[] = [];
-      let currentPage = 1;
-      let totalPagesToFetch = 1;
+      let usersToExport: UserData[] = [];
 
-      do {
-        const params: any = {
-          page: currentPage,
-          limit: 10,
-          search: searchQuery || undefined,
-        };
+      if (selectedUserIds.length > 0) {
+        usersToExport = users.filter(user => selectedUserIds.includes(user._id));
+      } else {
+        const allUsers: UserData[] = [];
+        let currentPage = 1;
+        let totalPagesToFetch = 1;
 
-        if (statusFilter !== "all") {
-          params.status = statusFilter;
-        }
+        do {
+          const params: any = {
+            page: currentPage,
+            limit: 10,
+            search: searchQuery || undefined,
+          };
 
-        const response = await apiService.getUsers(params);
+          if (statusFilter !== "all") {
+            params.status = statusFilter;
+          }
 
-        if (response.success) {
-          allUsers.push(...response.data.users);
-          totalPagesToFetch = response.data.pagination.totalPages;
-          currentPage++;
-        } else {
-          break;
-        }
-      } while (currentPage <= totalPagesToFetch);
+          const response = await apiService.getUsers(params);
+
+          if (response.success) {
+            allUsers.push(...response.data.users);
+            totalPagesToFetch = response.data.pagination.totalPages;
+            currentPage++;
+          } else {
+            break;
+          }
+        } while (currentPage <= totalPagesToFetch);
+
+        usersToExport = allUsers;
+      }
 
       const csvRows = [];
       csvRows.push(["Parent Name", "Parent Email", "Parent Phone", "Status", "Child Name", "Child Age", "Child Status", "Child Location"]);
 
-      allUsers.forEach(user => {
+      usersToExport.forEach(user => {
         const userStatus = user.status || "active";
         if (user.childrens.length === 0) {
           csvRows.push([
@@ -252,7 +263,8 @@ export default function UsersPage() {
       window.URL.revokeObjectURL(url);
 
       setIsExportDialogOpen(false);
-      toast.success(`CSV exported successfully with ${allUsers.length} users`);
+      toast.success(`CSV exported successfully with ${usersToExport.length} users`);
+      setSelectedUserIds([]);
     } catch (error: any) {
       toast.error(error.message || "Failed to export CSV");
     } finally {
@@ -264,31 +276,39 @@ export default function UsersPage() {
     try {
       setExporting(true);
 
-      const allUsers: UserData[] = [];
-      let currentPage = 1;
-      let totalPagesToFetch = 1;
+      let usersToExport: UserData[] = [];
 
-      do {
-        const params: any = {
-          page: currentPage,
-          limit: 10,
-          search: searchQuery || undefined,
-        };
+      if (selectedUserIds.length > 0) {
+        usersToExport = users.filter(user => selectedUserIds.includes(user._id));
+      } else {
+        const allUsers: UserData[] = [];
+        let currentPage = 1;
+        let totalPagesToFetch = 1;
 
-        if (statusFilter !== "all") {
-          params.status = statusFilter;
-        }
+        do {
+          const params: any = {
+            page: currentPage,
+            limit: 10,
+            search: searchQuery || undefined,
+          };
 
-        const response = await apiService.getUsers(params);
+          if (statusFilter !== "all") {
+            params.status = statusFilter;
+          }
 
-        if (response.success) {
-          allUsers.push(...response.data.users);
-          totalPagesToFetch = response.data.pagination.totalPages;
-          currentPage++;
-        } else {
-          break;
-        }
-      } while (currentPage <= totalPagesToFetch);
+          const response = await apiService.getUsers(params);
+
+          if (response.success) {
+            allUsers.push(...response.data.users);
+            totalPagesToFetch = response.data.pagination.totalPages;
+            currentPage++;
+          } else {
+            break;
+          }
+        } while (currentPage <= totalPagesToFetch);
+
+        usersToExport = allUsers;
+      }
 
       const doc = new jsPDF();
 
@@ -297,11 +317,11 @@ export default function UsersPage() {
 
       doc.setFontSize(11);
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
-      doc.text(`Total Users: ${allUsers.length}`, 14, 36);
+      doc.text(`Total Users: ${usersToExport.length}`, 14, 36);
 
       const tableData: any[] = [];
 
-      allUsers.forEach(user => {
+      usersToExport.forEach(user => {
         const userStatus = user.status || "active";
         if (user.childrens.length === 0) {
           tableData.push([
@@ -346,7 +366,8 @@ export default function UsersPage() {
       doc.save(`users_export_${new Date().toISOString().split('T')[0]}.pdf`);
 
       setIsExportDialogOpen(false);
-      toast.success(`PDF exported successfully with ${allUsers.length} users`);
+      toast.success(`PDF exported successfully with ${usersToExport.length} users`);
+      setSelectedUserIds([]);
     } catch (error: any) {
       toast.error(error.message || "Failed to export PDF");
     } finally {
@@ -366,10 +387,10 @@ export default function UsersPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Users Management</h1>
+        <h1 className="text-3xl font-bold">All Registered Users</h1>
         <Button onClick={() => setIsExportDialogOpen(true)} disabled={users.length === 0}>
           <Download className="mr-2 h-4 w-4" />
-          Export
+          Export {selectedUserIds.length > 0 && `(${selectedUserIds.length})`}
         </Button>
       </div>
 
@@ -402,6 +423,26 @@ export default function UsersPage() {
                 </SelectContent>
               </Select>
             </div>
+            {users.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="select-all"
+                  checked={selectedUserIds.length === users.length}
+                  onCheckedChange={handleSelectAll}
+                />
+                <label
+                  htmlFor="select-all"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  {selectedUserIds.length === users.length ? "Deselect All" : "Select All"}
+                </label>
+                {selectedUserIds.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {selectedUserIds.length} selected
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -416,12 +457,18 @@ export default function UsersPage() {
               <div className="space-y-2">
                 {users.map((user) => {
                   const isDeactivated = user.status === "inactive";
+                  const isSelected = selectedUserIds.includes(user._id);
                   return (
                     <Collapsible key={user._id}>
-                      <Card className="hover-scale transition-all">
+                      <Card className={`hover-scale transition-all ${isSelected ? 'ring-2 ring-primary' : ''}`}>
                         <CollapsibleTrigger className="w-full">
                           <div className="p-4 flex items-center justify-between">
                             <div className="flex items-center gap-4">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => handleSelectUser(user._id)}
+                                onClick={(e) => e.stopPropagation()}
+                              />
                               <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
                                 {user.avatar ? (
                                   <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
@@ -587,7 +634,10 @@ export default function UsersPage() {
           <DialogHeader>
             <DialogTitle>Export Users Data</DialogTitle>
             <DialogDescription>
-              Choose the format you want to export the users data
+              {selectedUserIds.length > 0
+                ? `Export ${selectedUserIds.length} selected user${selectedUserIds.length > 1 ? 's' : ''}`
+                : "Export all users data"
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">

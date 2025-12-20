@@ -75,7 +75,15 @@ import {
     SendBroadcastRequest,
     SendBroadcastResponse,
     GetBroadcastHistoryResponse,
-    UpdateUserStatusResponse
+    UpdateUserStatusResponse,
+    ReportsByStateParams,
+    ReportsByStateResponse,
+    GetReportCategoryDetailResponse,
+    ReportCategoryDetailParams,
+    ReportDashboardParams,
+    GetBehaviourReportResponse,
+    GetPopularReportResponse,
+    GetStateReportResponse
 } from './api_types';
 
 class ApiService {
@@ -358,6 +366,7 @@ class ApiService {
         formData.append('name', data.name);
         formData.append('email', data.email);
         formData.append('mobile', data.mobile);
+        formData.append('countryCode', data.countryCode);
 
         if (data.avatar) {
             formData.append('avatar', data.avatar);
@@ -382,7 +391,18 @@ class ApiService {
         return this.get<GetContactsResponse>(API_ENDPOINTS.CONTACT.LIST, params);
     }
 
-    public async resolveContact(id: string, data: ResolveContactRequest): Promise<ResolveContactResponse> {
+    public async resolveContact(id: string, data: ResolveContactRequest | FormData): Promise<ResolveContactResponse> {
+        if (data instanceof FormData) {
+            return this.axiosInstance.patch<any, ResolveContactResponse>(
+                API_ENDPOINTS.CONTACT.UPDATE(id),
+                data,
+                {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                }
+            );
+        }
         return this.patch<ResolveContactResponse>(API_ENDPOINTS.CONTACT.UPDATE(id), data);
     }
 
@@ -509,6 +529,26 @@ class ApiService {
 
     public async updateUserStatus(id: string, status: string): Promise<UpdateUserStatusResponse> {
         return this.put<UpdateUserStatusResponse>(API_ENDPOINTS.USER.UPDATE_STATUS(id), { status });
+    }
+
+    public async getReportsByState(params: ReportsByStateParams): Promise<ReportsByStateResponse> {
+        return this.get<ReportsByStateResponse>(API_ENDPOINTS.REPORTS.LIST_BY_STATE, params);
+    }
+
+    public async getReportCategoryDetail(categoryId: string, params: ReportCategoryDetailParams): Promise<GetReportCategoryDetailResponse> {
+        return this.get<GetReportCategoryDetailResponse>(API_ENDPOINTS.REPORTS.CATEGORY_DETAIL(categoryId), params);
+    }
+
+    public async getBehaviourReport(): Promise<GetBehaviourReportResponse> {
+        return this.get<GetBehaviourReportResponse>(API_ENDPOINTS.REPORTS.DASHBOARD, { type: 'behaviour' });
+    }
+
+    public async getPopularReport(): Promise<GetPopularReportResponse> {
+        return this.get<GetPopularReportResponse>(API_ENDPOINTS.REPORTS.DASHBOARD, { type: 'popular' });
+    }
+
+    public async getStateReport(): Promise<GetStateReportResponse> {
+        return this.get<GetStateReportResponse>(API_ENDPOINTS.REPORTS.DASHBOARD, { type: 'state' });
     }
 }
 

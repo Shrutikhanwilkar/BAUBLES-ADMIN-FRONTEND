@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Edit, Trash2, Star, X, Upload, DollarSign, Gift } from "lucide-react";
+import { Plus, Edit, Trash2, Star, X, Upload, Play, Pause, HardDrive, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { apiService } from "@/services/api_service";
 import { AudioBook, Category, ApiError } from "@/services/api_types";
@@ -34,13 +34,16 @@ const TableRowSkeleton = () => (
       <div className="h-6 w-20 bg-muted/80 rounded"></div>
     </td>
     <td className="px-4 py-3">
-      <div className="h-4 w-48 bg-muted/80 rounded"></div>
+      <div className="h-6 w-16 bg-muted/80 rounded"></div>
     </td>
     <td className="px-4 py-3">
       <div className="h-4 w-12 bg-muted/80 rounded"></div>
     </td>
     <td className="px-4 py-3">
-      <div className="h-6 w-16 bg-muted/80 rounded"></div>
+      <div className="h-4 w-12 bg-muted/80 rounded"></div>
+    </td>
+    <td className="px-4 py-3">
+      <div className="h-4 w-48 bg-muted/80 rounded"></div>
     </td>
     <td className="px-4 py-3 text-right">
       <div className="flex gap-2 justify-end">
@@ -52,6 +55,43 @@ const TableRowSkeleton = () => (
   </tr>
 );
 
+const StorageIndicator = ({ usedStorage, totalStorage }: { usedStorage: number; totalStorage: number }) => {
+  const percentage = Math.min((usedStorage / totalStorage) * 100, 100);
+  const usedGB = (usedStorage / (1024 * 1024 * 1024)).toFixed(2);
+  const totalGB = (totalStorage / (1024 * 1024 * 1024)).toFixed(2);
+
+  const getStorageColor = () => {
+    if (percentage >= 90) return "bg-red-500";
+    if (percentage >= 70) return "bg-yellow-500";
+    return "bg-green-500";
+  };
+
+  return (
+    <Card className="shadow-card">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-3">
+          <HardDrive className="h-5 w-5 text-muted-foreground" />
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Storage Usage</span>
+              <span className="text-sm text-muted-foreground">{usedGB} GB / {totalGB} GB</span>
+            </div>
+            <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+              <div
+                className={`h-full ${getStorageColor()} transition-all duration-300`}
+                style={{ width: `${percentage}%` }}
+              ></div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {percentage.toFixed(1)}% used
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function MusicLibrary() {
   const [audioBooks, setAudioBooks] = useState<AudioBook[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -62,6 +102,9 @@ export default function MusicLibrary() {
   const [editingBook, setEditingBook] = useState<AudioBook | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const [usedStorage, setUsedStorage] = useState(0);
+  const [totalStorage] = useState(10 * 1024 * 1024 * 1024);
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookDescription, setBookDescription] = useState("");
@@ -69,6 +112,7 @@ export default function MusicLibrary() {
   const [bookDuration, setBookDuration] = useState(0);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioFileName, setAudioFileName] = useState("");
+  const [audioFileSize, setAudioFileSize] = useState(0);
   const [isFree, setIsFree] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,9 +123,17 @@ export default function MusicLibrary() {
   const [totalPages, setTotalPages] = useState(0);
 
   const isInitialMount = useRef(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     fetchData();
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
   }, []);
 
   const fetchData = async () => {
@@ -174,14 +226,14 @@ export default function MusicLibrary() {
     try {
       const response = await apiService.deleteAudioBook(deletingBook._id);
       if (response.success) {
-        toast.success(response.message || "Music deleted successfully");
+        toast.success(response.message || "Message deleted successfully");
         await fetchAudioBooks();
         setIsDeleteDialogOpen(false);
         setDeletingBook(null);
       }
     } catch (error) {
       const apiError = error as ApiError;
-      toast.error(apiError.message || "Failed to delete music library");
+      toast.error(apiError.message || "Failed to delete message");
     } finally {
       setIsDeleting(false);
     }
@@ -189,6 +241,25 @@ export default function MusicLibrary() {
 
   const handleSetDefault = (id: string) => {
     toast.info("Set default functionality will be available soon");
+  };
+
+  const handlePlayPause = (book: AudioBook) => {
+    if (playingAudioId === book._id) {
+      audioRef.current?.pause();
+      setPlayingAudioId(null);
+    } else {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+
+      audioRef.current = new Audio(book.musicFile);
+      audioRef.current.play();
+      setPlayingAudioId(book._id);
+
+      audioRef.current.onended = () => {
+        setPlayingAudioId(null);
+      };
+    }
   };
 
   const handleOpenDialog = (book: AudioBook | null = null) => {
@@ -208,6 +279,7 @@ export default function MusicLibrary() {
       setBookDescription("");
       setBookCategory("");
       setBookDuration(0);
+      setAudioFileSize(0);
       setIsFree(true);
       setAudioFile(null);
       setAudioFileName("");
@@ -234,23 +306,25 @@ export default function MusicLibrary() {
       audio.src = objectUrl;
       setAudioFile(file);
       setAudioFileName(file.name);
+      setAudioFileSize(file.size);
     }
   };
 
   const handleRemoveAudio = () => {
     setAudioFile(null);
     setAudioFileName("");
+    setAudioFileSize(0);
     setBookDuration(0);
   };
 
   const handleSaveBook = async () => {
     if (!bookTitle.trim()) {
-      toast.error("Music title is required");
+      toast.error("Message title is required");
       return;
     }
 
     if (!bookDescription.trim()) {
-      toast.error("Music description is required");
+      toast.error("Message description is required");
       return;
     }
 
@@ -278,13 +352,14 @@ export default function MusicLibrary() {
         if (audioFile) {
           updateData.musicFile = audioFile;
           updateData.duration = bookDuration;
+          updateData.fileSize = audioFileSize;
         } else {
           updateData.duration = editingBook.duration;
         }
 
         const response = await apiService.updateAudioBook(editingBook._id, updateData);
         if (response.success) {
-          toast.success(response.message || "Music updated successfully");
+          toast.success(response.message || "Message updated successfully");
           await fetchAudioBooks();
         }
       } else {
@@ -298,13 +373,14 @@ export default function MusicLibrary() {
           description: bookDescription,
           statusCategory: bookCategory,
           duration: bookDuration,
+          fileSize: audioFileSize,
           musicFile: audioFile,
           isFree: isFree,
         };
 
         const response = await apiService.createAudioBook(createData);
         if (response.success) {
-          toast.success(response.message || "Music added successfully");
+          toast.success(response.message || "Message added successfully");
           await fetchAudioBooks();
         }
       }
@@ -313,7 +389,7 @@ export default function MusicLibrary() {
       resetForm();
     } catch (error) {
       const apiError = error as ApiError;
-      toast.error(apiError.message || "Failed to save music library");
+      toast.error(apiError.message || "Failed to save message");
     } finally {
       setIsSaving(false);
     }
@@ -324,6 +400,7 @@ export default function MusicLibrary() {
     setBookDescription("");
     setBookCategory("");
     setBookDuration(0);
+    setAudioFileSize(0);
     setIsFree(true);
     setAudioFile(null);
     setAudioFileName("");
@@ -348,18 +425,20 @@ export default function MusicLibrary() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Music Library</h1>
+        <h1 className="text-3xl font-bold">Santa's Message Library</h1>
         <Button onClick={() => handleOpenDialog()}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Music
+          Add Message
         </Button>
       </div>
+
+      {/* <StorageIndicator usedStorage={usedStorage} totalStorage={totalStorage} /> */}
 
       <Card className="shadow-card">
         <CardContent className="p-6">
           <div className="flex gap-4 mb-4">
             <Input
-              placeholder="Search music in the library..."
+              placeholder="Search messages in the library..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1"
@@ -388,12 +467,12 @@ export default function MusicLibrary() {
             <table className="w-full">
               <thead className="bg-muted/50">
                 <tr className="border-b">
-                  <th className="px-4 py-3 text-left font-medium">Title</th>
-                  <th className="px-4 py-3 text-left font-medium">Type</th>
-                  <th className="px-4 py-3 text-left font-medium">Category</th>
+                  <th className="px-4 py-3 text-left font-medium w-[200px]">Title</th>
+                  <th className="px-4 py-3 text-left font-medium w-[80px]">Type</th>
+                  <th className="px-4 py-3 text-left font-medium w-[120px]">Category</th>
+                  <th className="px-4 py-3 text-left font-medium w-[100px]">Duration</th>
                   <th className="px-4 py-3 text-left font-medium">Description</th>
-                  <th className="px-4 py-3 text-left font-medium">Duration</th>
-                  <th className="px-4 py-3 text-right font-medium">Actions</th>
+                  <th className="px-4 py-3 text-right font-medium w-[180px]">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -403,8 +482,8 @@ export default function MusicLibrary() {
                   ))
                 ) : audioBooks.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                      No music found
+                    <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                      No messages found
                     </td>
                   </tr>
                 ) : (
@@ -412,33 +491,54 @@ export default function MusicLibrary() {
                     <tr key={book._id} className="border-b hover:bg-muted/50">
                       <td className="px-4 py-3 font-medium">{book.title}</td>
                       <td className="px-4 py-3">
-                        {book.isFree ? (
-                          <img
-                            src="/free_icon.png"
-                            alt="Free"
-                            className="h-8 w-8"
-                          />
-                        ) : (
-                          <img
-                            src="/paid_icon.png"
-                            alt="Paid"
-                            className="h-8 w-8"
-                          />
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge style={{ backgroundColor: book.statusCategory.color }}>
-                          {book.statusCategory.name}
+                        <Badge variant={book.isFree ? "secondary" : "default"}>
+                          {book.isFree ? "Free" : "Paid"}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 max-w-xs truncate">{book.description}</td>
+                      <td className="px-4 py-3">
+                        <Badge
+                          style={{
+                            backgroundColor: `${book.statusCategory.color}20`,
+                            color: book.statusCategory.color,
+                            border: `1.5px solid ${book.statusCategory.color}60`
+                          }}
+                          className="font-bold rounded-full px-3 py-1.5"
+                        >
+                          <div className="flex items-center justify-center gap-2">
+                            <div
+                              className="w-2 h-2 rounded-full animate-pulse flex-shrink-0"
+                              style={{ backgroundColor: book.statusCategory.color }}
+                            />
+                            <span>{book.statusCategory.name}</span>
+                          </div>
+                        </Badge>
+                      </td>
                       <td className="px-4 py-3">{formatDuration(book.duration)}</td>
+                      {/* <td className="px-4 py-3 text-sm text-muted-foreground">
+                        {formatFileSize(book.fileSize || 0)}
+                      </td> */}
+                      <td className="px-4 py-3">
+                        <div className="max-w-md line-clamp-2">{book.description}</div>
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex gap-2 justify-end">
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => handlePlayPause(book)}
+                            title="Preview"
+                          >
+                            {playingAudioId === book._id ? (
+                              <Pause className="h-4 w-4" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => handleSetDefault(book._id)}
+                            title="Set as default"
                           >
                             <Star className="h-4 w-4" />
                           </Button>
@@ -446,6 +546,7 @@ export default function MusicLibrary() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleOpenDialog(book)}
+                            title="Edit"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -453,6 +554,7 @@ export default function MusicLibrary() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleOpenDeleteDialog(book)}
+                            title="Delete"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -470,23 +572,77 @@ export default function MusicLibrary() {
               <div className="text-sm text-muted-foreground">
                 {getDisplayRange()}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Show</span>
-                <Select
-                  value={pageLimit === -1 ? "all" : pageLimit.toString()}
-                  onValueChange={handleLimitChange}
-                >
-                  <SelectTrigger className="w-[100px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="all">All</SelectItem>
-                  </SelectContent>
-                </Select>
-                <span className="text-sm text-muted-foreground">entries</span>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Show</span>
+                  <Select
+                    value={pageLimit === -1 ? "all" : pageLimit.toString()}
+                    onValueChange={handleLimitChange}
+                  >
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="all">All</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm text-muted-foreground">entries</span>
+                </div>
+
+                {pageLimit !== -1 && totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+
+                    {(() => {
+                      const windowSize = 5;
+                      let windowStart = currentPage;
+                      let windowEnd = currentPage + windowSize - 1;
+
+                      if (windowEnd > totalPages) {
+                        windowEnd = totalPages;
+                        windowStart = Math.max(1, windowEnd - windowSize + 1);
+                      }
+
+                      const pages = [];
+                      for (let i = windowStart; i <= windowEnd; i++) {
+                        pages.push(i);
+                      }
+
+                      return pages.map((p) => (
+                        <Button
+                          key={p}
+                          variant={p === currentPage ? "default" : "outline"}
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setCurrentPage(p)}
+                        >
+                          {p}
+                        </Button>
+                      ));
+                    })()}
+
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -496,21 +652,21 @@ export default function MusicLibrary() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingBook ? "Edit Music" : "Add Music"}</DialogTitle>
+            <DialogTitle>{editingBook ? "Edit Message" : "Add Message"}</DialogTitle>
             <DialogDescription>
               {editingBook
-                ? "Update the music details below."
-                : "Create a new music by filling in the details below."}
+                ? "Update the message details below."
+                : "Create a new message by filling in the details below."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="title">Music Title</Label>
+              <Label htmlFor="title">Message Title</Label>
               <Input
                 id="title"
                 value={bookTitle}
                 onChange={(e) => setBookTitle(e.target.value)}
-                placeholder="Enter music title"
+                placeholder="Enter message title"
                 disabled={isSaving}
               />
             </div>
@@ -532,19 +688,19 @@ export default function MusicLibrary() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">Description / Message Script</Label>
               <Textarea
                 id="description"
                 value={bookDescription}
                 onChange={(e) => setBookDescription(e.target.value)}
-                placeholder="Enter book description"
-                rows={3}
+                placeholder="Enter message description or script"
+                rows={5}
                 disabled={isSaving}
               />
             </div>
 
             <div className="grid gap-2">
-              <Label>Music Type</Label>
+              <Label>Message Type</Label>
               <div className="flex gap-4">
                 <div
                   className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${isFree
@@ -589,8 +745,8 @@ export default function MusicLibrary() {
                 <div className="flex items-center gap-2 p-3 border rounded-lg bg-primary/5">
                   <div className="flex-1">
                     <div className="truncate text-sm font-medium">{audioFileName}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Duration: {formatDuration(bookDuration)}
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>Duration: {formatDuration(bookDuration)}</span>
                     </div>
                   </div>
                   <Button
@@ -639,8 +795,8 @@ export default function MusicLibrary() {
             </Button>
             <Button onClick={handleSaveBook} disabled={isSaving}>
               {isSaving
-                ? (editingBook ? "Updating Music..." : "Saving Music...")
-                : (editingBook ? "Update Music" : "Add Music")}
+                ? (editingBook ? "Updating Message..." : "Saving Message...")
+                : (editingBook ? "Update Message" : "Add Message")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -649,7 +805,7 @@ export default function MusicLibrary() {
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Delete Music</DialogTitle>
+            <DialogTitle>Delete Message</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete "{deletingBook?.title}"? This action cannot be undone.
             </DialogDescription>

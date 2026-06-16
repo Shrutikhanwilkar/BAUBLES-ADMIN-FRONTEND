@@ -45,11 +45,8 @@ export default function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  // const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  // const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  // const [isDeleting, setIsDeleting] = useState(false);
   const [userRole, setUserRole] = useState<string>("");
 
   const [categoryName, setCategoryName] = useState("");
@@ -123,35 +120,6 @@ export default function Categories() {
     }
   };
 
-  // const handleOpenDeleteDialog = (category: Category) => {
-  //   if (userRole !== "SUPERADMIN") {
-  //     toast.error("Only Super Admin can delete categories");
-  //     return;
-  //   }
-  //   setDeletingCategory(category);
-  //   setIsDeleteDialogOpen(true);
-  // };
-
-  // const handleDelete = async () => {
-  //   if (!deletingCategory) return;
-
-  //   setIsDeleting(true);
-  //   try {
-  //     const response = await apiService.deleteCategory(deletingCategory._id);
-  //     if (response.success) {
-  //       toast.success(response.message || "Category deleted successfully");
-  //       await fetchCategories();
-  //       setIsDeleteDialogOpen(false);
-  //       setDeletingCategory(null);
-  //     }
-  //   } catch (error) {
-  //     const apiError = error as ApiError;
-  //     toast.error(apiError.message || "Failed to delete category");
-  //   } finally {
-  //     setIsDeleting(false);
-  //   }
-  // };
-
   const handleOpenDialog = (category: Category | null = null) => {
     if (userRole !== "SUPERADMIN") {
       toast.error("Only Super Admin can manage categories");
@@ -167,10 +135,6 @@ export default function Categories() {
       setCategoryIcon(iconMapping[category.visibilityRank] || "Star");
       setIsDialogOpen(true);
     } else {
-      // if (categories.length >= 4) {
-      //   toast.error("Maximum 4 categories allowed");
-      //   return;
-      // }
       setEditingCategory(null);
       setCategoryName("");
       setCategoryDescription("");
@@ -178,6 +142,29 @@ export default function Categories() {
       setCategoryRank(categories.length + 1);
       setCategoryIcon("Star");
       setIsDialogOpen(true);
+    }
+  };
+
+  const handleRankChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+
+    if (value === "") {
+      setCategoryRank(1);
+      return;
+    }
+
+    const parsed = parseInt(value);
+
+    if (isNaN(parsed)) {
+      return;
+    }
+
+    if (parsed < 1) {
+      setCategoryRank(1);
+    } else if (parsed > 4) {
+      setCategoryRank(4);
+    } else {
+      setCategoryRank(parsed);
     }
   };
 
@@ -189,6 +176,11 @@ export default function Categories() {
 
     if (!categoryDescription.trim()) {
       toast.error("Category description is required");
+      return;
+    }
+
+    if (categoryRank < 1 || categoryRank > 4) {
+      toast.error("Visibility rank must be between 1 and 4");
       return;
     }
 
@@ -208,14 +200,7 @@ export default function Categories() {
           toast.success(response.message || "Category updated successfully");
           await fetchCategories();
         }
-      } 
-      // else {
-      //   const response = await apiService.createCategory(categoryData);
-      //   if (response.success) {
-      //     toast.success(response.message || "Category added successfully");
-      //     await fetchCategories();
-      //   }
-      // }
+      }
 
       setIsDialogOpen(false);
       resetForm();
@@ -242,22 +227,16 @@ export default function Categories() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Behaviour Categories</h1>
-        {/* {isSuperAdmin && (
-          <Button onClick={() => handleOpenDialog()}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Category
-          </Button>
-        )} */}
       </div>
 
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           {[...Array(6)].map((_, index) => (
             <CategorySkeleton key={index} />
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           {categories.map((category) => {
             const IconComponent = getIconComponent(category.visibilityRank);
             return (
@@ -289,15 +268,6 @@ export default function Categories() {
                         <Edit className="mr-2 h-4 w-4" />
                         Edit
                       </Button>
-                      {/* <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => handleOpenDeleteDialog(category)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </Button> */}
                     </div>
                   )}
                 </CardContent>
@@ -345,11 +315,12 @@ export default function Categories() {
                 id="rank"
                 type="number"
                 min="1"
-                max="10"
+                max="4"
                 value={categoryRank}
-                onChange={(e) => setCategoryRank(parseInt(e.target.value) || 1)}
+                onChange={handleRankChange}
                 disabled={isSaving}
               />
+              <p className="text-xs text-muted-foreground">Rank must be between 1 and 4</p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="icon">Category Icon</Label>
@@ -397,25 +368,6 @@ export default function Categories() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Delete Category</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{deletingCategory?.name}"? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isDeleting}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-              {isDeleting ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog> */}
     </div>
   );
 }

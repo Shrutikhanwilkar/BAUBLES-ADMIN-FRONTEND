@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Users, Baby, MapPin, Phone, Download, FileText, FileSpreadsheet, Loader2, UserX, UserCheck } from "lucide-react";
+import { Search, Users, Baby, MapPin, Phone, Download, FileText, FileSpreadsheet, Loader2, UserX, UserCheck, ChevronRight, ChevronLeft } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Collapsible,
@@ -49,7 +49,7 @@ const UserSkeleton = () => (
 export default function UsersPage() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("active");
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
@@ -218,7 +218,7 @@ export default function UsersPage() {
       }
 
       const csvRows = [];
-      csvRows.push(["Parent Name", "Parent Email", "Parent Phone", "Status", "Child Name", "Child Age", "Child Status", "Child Location"]);
+      csvRows.push(["Parent Helper Name", "Parent Helper Email", "Parent Helper Phone", "Status", "Believer Name", "Believer Age", "Believer Status", "Believer Location"]);
 
       usersToExport.forEach(user => {
         const userStatus = user.status || "active";
@@ -228,7 +228,7 @@ export default function UsersPage() {
             user.email,
             user.mobile || "N/A",
             userStatus,
-            "No children added yet",
+            "No believers added yet",
             "N/A",
             "N/A",
             "N/A"
@@ -256,14 +256,14 @@ export default function UsersPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `believer_families_export_${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
 
       setIsExportDialogOpen(false);
-      toast.success(`CSV exported successfully with ${usersToExport.length} users`);
+      toast.success(`CSV exported successfully with ${usersToExport.length} parent helpers`);
       setSelectedUserIds([]);
     } catch (error: any) {
       toast.error(error.message || "Failed to export CSV");
@@ -313,11 +313,11 @@ export default function UsersPage() {
       const doc = new jsPDF();
 
       doc.setFontSize(18);
-      doc.text('Users Export Report', 14, 22);
+      doc.text('Believer Families Export Report', 14, 22);
 
       doc.setFontSize(11);
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
-      doc.text(`Total Users: ${usersToExport.length}`, 14, 36);
+      doc.text(`Total Parent Helpers: ${usersToExport.length}`, 14, 36);
 
       const tableData: any[] = [];
 
@@ -329,7 +329,7 @@ export default function UsersPage() {
             user.email,
             user.mobile || "N/A",
             userStatus,
-            "No children added yet",
+            "No believers added yet",
             "N/A",
             "N/A",
             "N/A"
@@ -354,7 +354,7 @@ export default function UsersPage() {
       });
 
       autoTable(doc, {
-        head: [['Parent Name', 'Parent Email', 'Parent Phone', 'Status', 'Child Name', 'Child Age', 'Child Status', 'Child Location']],
+        head: [['Parent Helper Name', 'Parent Helper Email', 'Parent Helper Phone', 'Status', 'Believer Name', 'Believer Age', 'Believer Status', 'Believer Location']],
         body: tableData,
         startY: 45,
         styles: { fontSize: 8, cellPadding: 3 },
@@ -363,10 +363,10 @@ export default function UsersPage() {
         margin: { top: 45 },
       });
 
-      doc.save(`users_export_${new Date().toISOString().split('T')[0]}.pdf`);
+      doc.save(`believer_families_export_${new Date().toISOString().split('T')[0]}.pdf`);
 
       setIsExportDialogOpen(false);
-      toast.success(`PDF exported successfully with ${usersToExport.length} users`);
+      toast.success(`PDF exported successfully with ${usersToExport.length} parent helpers`);
       setSelectedUserIds([]);
     } catch (error: any) {
       toast.error(error.message || "Failed to export PDF");
@@ -387,7 +387,7 @@ export default function UsersPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">All Registered Users</h1>
+        <h1 className="text-3xl font-bold">Believer Families</h1>
         <Button onClick={() => setIsExportDialogOpen(true)} disabled={users.length === 0}>
           <Download className="mr-2 h-4 w-4" />
           Export {selectedUserIds.length > 0 && `(${selectedUserIds.length})`}
@@ -399,7 +399,7 @@ export default function UsersPage() {
           <div className="flex flex-col gap-4">
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Parent Users
+              List of Parent Helpers
             </CardTitle>
             <div className="flex gap-4">
               <div className="relative flex-1 max-w-sm">
@@ -413,13 +413,13 @@ export default function UsersPage() {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[200px]">
+                <SelectTrigger className="w-[220px]">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Users</SelectItem>
-                  <SelectItem value="active">Active Users</SelectItem>
-                  <SelectItem value="inactive">Deactivated Users</SelectItem>
+                  <SelectItem value="all">All Parent Helpers</SelectItem>
+                  <SelectItem value="active">Active Parent Helpers</SelectItem>
+                  <SelectItem value="inactive">Inactive Parent Helpers</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -501,7 +501,7 @@ export default function UsersPage() {
                             </div>
                             <div className="flex items-center gap-2">
                               <Badge variant="secondary" className="text-base px-3 py-1">
-                                {user.childrenCount} {user.childrenCount === 1 ? "Child" : "Children"}
+                                {user.childrenCount} {user.childrenCount === 1 ? "Believer" : "Believers"}
                               </Badge>
                               <Button
                                 variant="outline"
@@ -525,14 +525,14 @@ export default function UsersPage() {
                           <div className="px-4 pb-4 pt-2 border-t">
                             <p className="text-sm font-semibold mb-3 flex items-center gap-2">
                               <Baby className="h-4 w-4" />
-                              Children Profiles
+                              Believer Profiles
                             </p>
                             {user.childrens.length === 0 ? (
                               <Card className="bg-muted/50">
                                 <CardContent className="p-8 flex flex-col items-center justify-center text-center">
                                   <Baby className="h-12 w-12 text-muted-foreground mb-3 opacity-50" />
-                                  <p className="text-muted-foreground font-medium">No children added yet</p>
-                                  <p className="text-sm text-muted-foreground mt-1">This parent hasn't registered any children</p>
+                                  <p className="text-muted-foreground font-medium">No believers added yet</p>
+                                  <p className="text-sm text-muted-foreground mt-1">This parent helper hasn't registered any believers</p>
                                 </CardContent>
                               </Card>
                             ) : (
@@ -594,23 +594,77 @@ export default function UsersPage() {
                   <div className="text-sm text-muted-foreground">
                     {getDisplayRange()}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Show</span>
-                    <Select
-                      value={pageLimit === -1 ? "all" : pageLimit.toString()}
-                      onValueChange={handleLimitChange}
-                    >
-                      <SelectTrigger className="w-[100px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="20">20</SelectItem>
-                        <SelectItem value="50">50</SelectItem>
-                        <SelectItem value="all">All</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <span className="text-sm text-muted-foreground">entries</span>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Show</span>
+                      <Select
+                        value={pageLimit === -1 ? "all" : pageLimit.toString()}
+                        onValueChange={handleLimitChange}
+                      >
+                        <SelectTrigger className="w-[100px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="all">All</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm text-muted-foreground">entries</span>
+                    </div>
+
+                    {pageLimit !== -1 && totalPages > 1 && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setPage((p) => Math.max(1, p - 1))}
+                          disabled={page === 1}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+
+                        {(() => {
+                          const windowSize = 5;
+                          let windowStart = page;
+                          let windowEnd = page + windowSize - 1;
+
+                          if (windowEnd > totalPages) {
+                            windowEnd = totalPages;
+                            windowStart = Math.max(1, windowEnd - windowSize + 1);
+                          }
+
+                          const pages = [];
+                          for (let i = windowStart; i <= windowEnd; i++) {
+                            pages.push(i);
+                          }
+
+                          return pages.map((p) => (
+                            <Button
+                              key={p}
+                              variant={p === page ? "default" : "outline"}
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => setPage(p)}
+                            >
+                              {p}
+                            </Button>
+                          ));
+                        })()}
+
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                          disabled={page === totalPages}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -619,9 +673,9 @@ export default function UsersPage() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-16">
                 <Users className="h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-xl font-semibold mb-2">No Users Found</h3>
+                <h3 className="text-xl font-semibold mb-2">No Parent Helpers Found</h3>
                 <p className="text-muted-foreground">
-                  {searchQuery ? "Try adjusting your search criteria" : "No users available"}
+                  {searchQuery ? "Try adjusting your search criteria" : "No parent helpers available"}
                 </p>
               </CardContent>
             </Card>
@@ -632,11 +686,11 @@ export default function UsersPage() {
       <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Export Users Data</DialogTitle>
+            <DialogTitle>Export Believer Families Data</DialogTitle>
             <DialogDescription>
               {selectedUserIds.length > 0
-                ? `Export ${selectedUserIds.length} selected user${selectedUserIds.length > 1 ? 's' : ''}`
-                : "Export all users data"
+                ? `Export ${selectedUserIds.length} selected parent helper${selectedUserIds.length > 1 ? 's' : ''}`
+                : "Export all parent helpers data"
               }
             </DialogDescription>
           </DialogHeader>
@@ -684,7 +738,7 @@ export default function UsersPage() {
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>
-              {selectedUser?.status === "inactive" ? "Activate User" : "Deactivate User"}
+              {selectedUser?.status === "inactive" ? "Activate Parent Helper" : "Deactivate Parent Helper"}
             </DialogTitle>
             <DialogDescription>
               {selectedUser?.status === "inactive"

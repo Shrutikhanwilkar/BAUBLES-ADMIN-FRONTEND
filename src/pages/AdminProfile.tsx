@@ -11,6 +11,7 @@ import { AdminProfile as AdminProfileType } from "@/services/api_types";
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { parsePhoneNumber } from 'libphonenumber-js';
+import { useUnsavedChanges } from "./UnsavedChangesContext ";
 
 const COUNTRY_PHONE_LENGTHS: { [key: string]: number } = {
   'IN': 10,
@@ -128,6 +129,7 @@ export default function AdminProfile() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hasFetched = useRef(false);
+  const { setHasUnsavedChanges } = useUnsavedChanges();
 
   useEffect(() => {
     let isMounted = true;
@@ -147,6 +149,22 @@ export default function AdminProfile() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!profile) return;
+    const changed =
+      name !== profile.name ||
+      email !== profile.email ||
+      mobile !== (profile.mobile || "") ||
+      avatarFile !== null;
+    setHasUnsavedChanges(changed);
+  }, [name, email, mobile, avatarFile, profile, setHasUnsavedChanges]);
+
+  useEffect(() => {
+    return () => {
+      setHasUnsavedChanges(false);
+    };
+  }, [setHasUnsavedChanges]);
 
   const fetchProfile = async () => {
     try {
@@ -305,6 +323,7 @@ export default function AdminProfile() {
         if (response.data.avatar) {
           setAvatarPreview(response.data.avatar);
         }
+        setHasUnsavedChanges(false);
         toast.success("Profile updated successfully!");
       }
     } catch (error: any) {
@@ -412,11 +431,11 @@ export default function AdminProfile() {
         }
       `}</style>
 
-      <h1 className="text-3xl font-bold">Your Profile</h1>
+      <h1 className="text-3xl font-bold">My Profile</h1>
 
       <Card className="shadow-card">
         <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
+          <CardTitle>Elf Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center gap-6">

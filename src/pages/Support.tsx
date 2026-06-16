@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, CheckCircle, Clock, Loader2, Filter, X, Upload, FileImage } from "lucide-react";
+import { MessageSquare, CheckCircle, Clock, Loader2, Filter, X, Upload, FileImage, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const ContactSkeleton = () => (
   <Card className="shadow-card animate-pulse">
@@ -66,6 +67,7 @@ export default function Support() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [openContacts, setOpenContacts] = useState<Record<string, boolean>>({});
 
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -108,6 +110,10 @@ export default function Support() {
     const newLimit = value === "all" ? -1 : parseInt(value);
     setPageLimit(newLimit);
     setPage(1);
+  };
+
+  const toggleContact = (id: string) => {
+    setOpenContacts(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   const handleSolutionChange = (id: string, value: string) => {
@@ -318,185 +324,196 @@ export default function Support() {
         <>
           <div className="grid gap-4">
             {contacts.map((contact) => (
-              <Card key={contact._id} className="shadow-card hover-scale transition-all">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <MessageSquare className="h-6 w-6 text-primary" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg">{contact.name}</CardTitle>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <p className="text-sm text-muted-foreground">{contact.email}</p>
-                          {contact.mobile && (
-                            <>
+              <Collapsible
+                key={contact._id}
+                open={!!openContacts[contact._id]}
+                onOpenChange={() => toggleContact(contact._id)}
+              >
+                <Card className="shadow-card hover-scale transition-all">
+                  <CollapsibleTrigger className="w-full">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-4">
+                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <MessageSquare className="h-6 w-6 text-primary" />
+                          </div>
+                          <div className="text-left">
+                            <CardTitle className="text-lg">{contact.name}</CardTitle>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <p className="text-sm text-muted-foreground">{contact.email}</p>
+                              {contact.mobile && (
+                                <>
+                                  <span className="text-muted-foreground">•</span>
+                                  <p className="text-sm text-muted-foreground">{contact.mobile}</p>
+                                </>
+                              )}
                               <span className="text-muted-foreground">•</span>
-                              <p className="text-sm text-muted-foreground">{contact.mobile}</p>
-                            </>
-                          )}
-                          <span className="text-muted-foreground">•</span>
-                          <p className="text-sm text-muted-foreground">{getTimeAgo(contact.createdAt)}</p>
-                          {contact.type && (
-                            <>
-                              <span className="text-muted-foreground">•</span>
-                              <Badge variant="outline" className="text-xs">
-                                {contact.type}
-                              </Badge>
-                            </>
-                          )}
+                              <p className="text-sm text-muted-foreground">{getTimeAgo(contact.createdAt)}</p>
+                              {contact.type && (
+                                <>
+                                  <span className="text-muted-foreground">•</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {contact.type}
+                                  </Badge>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={contact.isResolved ? "secondary" : "destructive"}>
+                            {contact.isResolved ? "resolved" : "unresolved"}
+                          </Badge>
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openContacts[contact._id] ? 'rotate-180' : ''}`} />
                         </div>
                       </div>
-                    </div>
-                    <Badge
-                      variant={contact.isResolved ? "secondary" : "destructive"}
-                    >
-                      {contact.isResolved ? "resolved" : "unresolved"}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-sm font-medium mb-1">Query:</p>
-                      <p className="text-muted-foreground">{contact.message}</p>
-                    </div>
-
-                    {!contact.isResolved ? (
-                      <div className="space-y-3 pt-2">
-                        <div className="space-y-2">
-                          <Label htmlFor={`solution-${contact._id}`}>Solution</Label>
-                          <Textarea
-                            id={`solution-${contact._id}`}
-                            placeholder="Enter your solution here..."
-                            value={solutions[contact._id] || ""}
-                            onChange={(e) => handleSolutionChange(contact._id, e.target.value)}
-                            rows={4}
-                            disabled={submitting === contact._id}
-                          />
+                    </CardHeader>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-sm font-medium mb-1">Query:</p>
+                          <p className="text-muted-foreground">{contact.message}</p>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label>Attach Images/Videos (Optional)</Label>
-                          <div className="flex items-center gap-2">
+                        {!contact.isResolved ? (
+                          <div className="space-y-3 pt-2">
+                            <div className="space-y-2">
+                              <Label htmlFor={`solution-${contact._id}`}>Solution</Label>
+                              <Textarea
+                                id={`solution-${contact._id}`}
+                                placeholder="Enter your solution here..."
+                                value={solutions[contact._id] || ""}
+                                onChange={(e) => handleSolutionChange(contact._id, e.target.value)}
+                                rows={4}
+                                disabled={submitting === contact._id}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Attach Images/Videos (Optional)</Label>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => fileInputRefs.current[contact._id]?.click()}
+                                  disabled={submitting === contact._id}
+                                >
+                                  <Upload className="h-4 w-4 mr-2" />
+                                  Upload Files
+                                </Button>
+                                <input
+                                  ref={(el) => fileInputRefs.current[contact._id] = el}
+                                  type="file"
+                                  accept="image/*,video/*"
+                                  multiple
+                                  className="hidden"
+                                  onChange={(e) => handleImageSelect(contact._id, e.target.files)}
+                                  disabled={submitting === contact._id}
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                  {(solutionImages[contact._id]?.length || 0)} file(s) selected
+                                </span>
+                              </div>
+
+                              {previewUrls[contact._id]?.length > 0 && (
+                                <div className="grid grid-cols-4 gap-2 mt-2">
+                                  {previewUrls[contact._id].map((url, index) => (
+                                    <div key={index} className="relative group">
+                                      {isVideoFile(solutionImages[contact._id][index].name) ? (
+                                        <video
+                                          src={url}
+                                          className="w-full h-24 object-cover rounded-lg border"
+                                        />
+                                      ) : (
+                                        <img
+                                          src={url}
+                                          alt={`Preview ${index + 1}`}
+                                          className="w-full h-24 object-cover rounded-lg border"
+                                        />
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveImage(contact._id, index)}
+                                        className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        disabled={submitting === contact._id}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
                             <Button
-                              type="button"
-                              variant="outline"
+                              variant="default"
                               size="sm"
-                              onClick={() => fileInputRefs.current[contact._id]?.click()}
+                              onClick={() => handleSubmit(contact._id)}
                               disabled={submitting === contact._id}
                             >
-                              <Upload className="h-4 w-4 mr-2" />
-                              Upload Files
+                              {submitting === contact._id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                  Submitting...
+                                </>
+                              ) : (
+                                "Submit Solution"
+                              )}
                             </Button>
-                            <input
-                              ref={(el) => fileInputRefs.current[contact._id] = el}
-                              type="file"
-                              accept="image/*,video/*"
-                              multiple
-                              className="hidden"
-                              onChange={(e) => handleImageSelect(contact._id, e.target.files)}
-                              disabled={submitting === contact._id}
-                            />
-                            <span className="text-xs text-muted-foreground">
-                              {(solutionImages[contact._id]?.length || 0)} file(s) selected
-                            </span>
                           </div>
-
-                          {previewUrls[contact._id]?.length > 0 && (
-                            <div className="grid grid-cols-4 gap-2 mt-2">
-                              {previewUrls[contact._id].map((url, index) => (
-                                <div key={index} className="relative group">
-                                  {isVideoFile(solutionImages[contact._id][index].name) ? (
-                                    <video
-                                      src={url}
-                                      className="w-full h-24 object-cover rounded-lg border"
-                                    />
-                                  ) : (
-                                    <img
-                                      src={url}
-                                      alt={`Preview ${index + 1}`}
-                                      className="w-full h-24 object-cover rounded-lg border"
-                                    />
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveImage(contact._id, index)}
-                                    className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    disabled={submitting === contact._id}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleSubmit(contact._id)}
-                          disabled={submitting === contact._id}
-                        >
-                          {submitting === contact._id ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                              Submitting...
-                            </>
-                          ) : (
-                            "Submit Solution"
-                          )}
-                        </Button>
-                      </div>
-                    ) : (
-                      contact.solution && (
-                        <div className="pt-2 border-t space-y-3">
-                          <div>
-                            <p className="text-sm font-medium mb-2 text-green-600 flex items-center gap-2">
-                              <CheckCircle className="h-4 w-4" />
-                              Solution:
-                            </p>
-                            <p className="text-muted-foreground bg-green-50 dark:bg-green-950/20 p-3 rounded-lg">
-                              {contact.solution}
-                            </p>
-                          </div>
-
-                          {contact.solutionImages && contact.solutionImages.length > 0 && (
-                            <div>
-                              <p className="text-sm font-medium mb-2 flex items-center gap-2">
-                                <FileImage className="h-4 w-4" />
-                                Attachments:
-                              </p>
-                              <div className="grid grid-cols-4 gap-2">
-                                {contact.solutionImages.map((imageUrl, index) => (
-                                  <div key={index} className="relative group cursor-pointer">
-                                    {isVideoFile(imageUrl) ? (
-                                      <video
-                                        src={imageUrl}
-                                        className="w-full h-24 object-cover rounded-lg border hover:opacity-80 transition-opacity"
-                                        onClick={() => setLightboxImage(imageUrl)}
-                                        controls
-                                      />
-                                    ) : (
-                                      <img
-                                        src={imageUrl}
-                                        alt={`Solution attachment ${index + 1}`}
-                                        className="w-full h-24 object-cover rounded-lg border hover:opacity-80 transition-opacity"
-                                        onClick={() => setLightboxImage(imageUrl)}
-                                      />
-                                    )}
-                                  </div>
-                                ))}
+                        ) : (
+                          contact.solution && (
+                            <div className="pt-2 border-t space-y-3">
+                              <div>
+                                <p className="text-sm font-medium mb-2 text-green-600 flex items-center gap-2">
+                                  <CheckCircle className="h-4 w-4" />
+                                  Solution:
+                                </p>
+                                <p className="text-muted-foreground bg-green-50 dark:bg-green-950/20 p-3 rounded-lg">
+                                  {contact.solution}
+                                </p>
                               </div>
+
+                              {contact.solutionImages && contact.solutionImages.length > 0 && (
+                                <div>
+                                  <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                                    <FileImage className="h-4 w-4" />
+                                    Attachments:
+                                  </p>
+                                  <div className="grid grid-cols-4 gap-2">
+                                    {contact.solutionImages.map((imageUrl, index) => (
+                                      <div key={index} className="relative group cursor-pointer">
+                                        {isVideoFile(imageUrl) ? (
+                                          <video
+                                            src={imageUrl}
+                                            className="w-full h-24 object-cover rounded-lg border hover:opacity-80 transition-opacity"
+                                            onClick={() => setLightboxImage(imageUrl)}
+                                            controls
+                                          />
+                                        ) : (
+                                          <img
+                                            src={imageUrl}
+                                            alt={`Solution attachment ${index + 1}`}
+                                            className="w-full h-24 object-cover rounded-lg border hover:opacity-80 transition-opacity"
+                                            onClick={() => setLightboxImage(imageUrl)}
+                                          />
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      )
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                          )
+                        )}
+                      </div>
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
             ))}
           </div>
 
@@ -529,23 +546,77 @@ export default function Support() {
               <div className="text-sm text-muted-foreground">
                 {getDisplayRange()}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Show</span>
-                <Select
-                  value={pageLimit === -1 ? "all" : pageLimit.toString()}
-                  onValueChange={handleLimitChange}
-                >
-                  <SelectTrigger className="w-[100px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="all">All</SelectItem>
-                  </SelectContent>
-                </Select>
-                <span className="text-sm text-muted-foreground">entries</span>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Show</span>
+                  <Select
+                    value={pageLimit === -1 ? "all" : pageLimit.toString()}
+                    onValueChange={handleLimitChange}
+                  >
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="all">All</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm text-muted-foreground">entries</span>
+                </div>
+
+                {pageLimit !== -1 && totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+
+                    {(() => {
+                      const windowSize = 5;
+                      let windowStart = page;
+                      let windowEnd = page + windowSize - 1;
+
+                      if (windowEnd > totalPages) {
+                        windowEnd = totalPages;
+                        windowStart = Math.max(1, windowEnd - windowSize + 1);
+                      }
+
+                      const pages = [];
+                      for (let i = windowStart; i <= windowEnd; i++) {
+                        pages.push(i);
+                      }
+
+                      return pages.map((p) => (
+                        <Button
+                          key={p}
+                          variant={p === page ? "default" : "outline"}
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setPage(p)}
+                        >
+                          {p}
+                        </Button>
+                      ));
+                    })()}
+
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           )}

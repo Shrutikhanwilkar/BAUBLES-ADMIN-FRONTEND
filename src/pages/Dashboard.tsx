@@ -47,8 +47,13 @@ export default function Dashboard() {
   const [stateLoading, setStateLoading] = useState(true);
   const [avgNice, setAvgNice] = useState(0);
   const [avgNaughty, setAvgNaughty] = useState(0);
+  const [userName, setUserName] = useState<string>("Admin");
 
   useEffect(() => {
+    const name = localStorage.getItem("userName");
+    if (name) {
+      setUserName(name);
+    }
     fetchDashboardStats();
     fetchStateReport();
   }, []);
@@ -79,6 +84,12 @@ export default function Dashboard() {
       setStateLoading(true);
       const response = await apiService.getStateReport();
       if (response.success) {
+        const allStatesNice = response.data.data.reduce((sum, state) => sum + state.nice, 0);
+        const allStatesNaughty = response.data.data.reduce((sum, state) => sum + state.naughty, 0);
+        const allStatesTotal = allStatesNice + allStatesNaughty;
+        const allStatesNicePercent = allStatesTotal > 0 ? Math.round((allStatesNice / allStatesTotal) * 100) : 0;
+        const allStatesNaughtyPercent = allStatesTotal > 0 ? Math.round((allStatesNaughty / allStatesTotal) * 100) : 0;
+
         const stateData = response.data.data.map((state) => {
           const total = state.nice + state.naughty;
           const nicePercent = total > 0 ? Math.round((state.nice / total) * 100) : 0;
@@ -88,10 +99,20 @@ export default function Dashboard() {
             state: state.state,
             nice: nicePercent,
             naughty: naughtyPercent,
+            niceCount: state.nice,
+            naughtyCount: state.naughty,
           };
         });
 
-        setStatePercentageData(stateData);
+        const allStatesEntry = {
+          state: "All States",
+          nice: allStatesNicePercent,
+          naughty: allStatesNaughtyPercent,
+          niceCount: allStatesNice,
+          naughtyCount: allStatesNaughty,
+        };
+
+        setStatePercentageData([allStatesEntry, ...stateData]);
 
         const totalNice = response.data.data.reduce((sum, state) => sum + state.nice, 0);
         const totalNaughty = response.data.data.reduce((sum, state) => sum + state.naughty, 0);
@@ -152,7 +173,7 @@ export default function Dashboard() {
 
   const statsCards = [
     {
-      title: "Total Parents",
+      title: "Parent Helpers",
       value: stats?.userCount || 0,
       icon: Users,
       color: "text-primary",
@@ -160,7 +181,7 @@ export default function Dashboard() {
       route: "/users",
     },
     {
-      title: "Total Children",
+      title: "Believers",
       value: stats?.childrenCount || 0,
       icon: Baby,
       color: "text-blue-600",
@@ -168,7 +189,7 @@ export default function Dashboard() {
       route: "/users",
     },
     {
-      title: "Music Library",
+      title: "Santa's Message Library",
       value: stats?.musicCount || 0,
       icon: BookAudio,
       color: "text-purple-600",
@@ -176,7 +197,7 @@ export default function Dashboard() {
       route: "/musiclibrary",
     },
     {
-      title: "Total Gifts",
+      title: "Active Gift Suggestions",
       value: stats?.giftCount || 0,
       icon: Gift,
       color: "text-green-600",
@@ -186,27 +207,53 @@ export default function Dashboard() {
   ];
 
   const stateChartData = stats?.stateCounts
-    ? Object.entries(stats.stateCounts).map(([name, value], index) => ({
-      name,
-      value,
-      color: STATE_COLORS[index % STATE_COLORS.length],
-    }))
+    ? (() => {
+      const entries = Object.entries(stats.stateCounts).map(([name, value], index) => ({
+        name,
+        value,
+        color: STATE_COLORS[index % STATE_COLORS.length],
+      }));
+
+      const totalValue = entries.reduce((sum, entry) => sum + entry.value, 0);
+      const otherThreshold = totalValue * 0.05;
+
+      const mainEntries = entries.filter(entry => entry.value >= otherThreshold);
+      const otherEntries = entries.filter(entry => entry.value < otherThreshold);
+
+      if (otherEntries.length > 0) {
+        const otherValue = otherEntries.reduce((sum, entry) => sum + entry.value, 0);
+        mainEntries.push({
+          name: "Other",
+          value: otherValue,
+          color: STATE_COLORS[mainEntries.length % STATE_COLORS.length],
+        });
+      }
+
+      return mainEntries;
+    })()
     : [];
 
   const genderCards = [
     {
-      title: "Male Children",
+      title: "Boys",
       value: stats?.maleChildren || 0,
       icon: Baby,
       color: "text-blue-600",
       bgColor: "bg-blue-600/10",
     },
     {
-      title: "Female Children",
+      title: "Girls",
       value: stats?.femaleChildren || 0,
       icon: Baby,
       color: "text-pink-600",
       bgColor: "bg-pink-600/10",
+    },
+    {
+      title: "Rather Not Say",
+      value: stats?.otherChildren || 0,
+      icon: Baby,
+      color: "text-purple-600",
+      bgColor: "bg-purple-600/10",
     },
   ];
 
@@ -219,9 +266,9 @@ export default function Dashboard() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Welcome back, Admin! 👋</h1>
+          <h1 className="text-3xl font-bold mb-2">Welcome to the North Pole Records Room, {userName}! 🎅</h1>
           <p className="text-muted-foreground">
-            Here's what's happening today.
+            Here's what's happening with Santa's Records today.
           </p>
         </div>
       </div>
@@ -311,7 +358,7 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Statewise Children's
+              Australia's Snapshot
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -348,7 +395,7 @@ export default function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               {genderCards.map((card, index) => (
                 <Card key={index} className="shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -376,7 +423,7 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <div className="space-y-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Behaviour Distribution Across States</h3>
+                <h3 className="text-lg font-semibold">Santa's List Snapshot by State</h3>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setViewMode("chart")}
@@ -414,7 +461,11 @@ export default function Dashboard() {
                           border: '1px solid #f3f4f6',
                           borderRadius: '8px',
                         }}
-                        formatter={(value) => `${value}%`}
+                        formatter={(value, name, props) => {
+                          const isNaughty = name === "Naughty %";
+                          const count = isNaughty ? props.payload.naughtyCount : props.payload.niceCount;
+                          return [count, isNaughty ? "Naughty" : "Nice"];
+                        }}
                       />
                       <Legend />
                       <Bar dataKey="naughty" fill="#F44336" radius={[8, 8, 0, 0]} name="Naughty %" />
@@ -457,7 +508,9 @@ export default function Dashboard() {
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-muted-foreground">Best Performing State</span>
                             <span className="font-semibold">
-                              {statePercentageData.reduce((max, state) => state.nice > max.nice ? state : max).state}
+                              {statePercentageData.length > 1
+                                ? statePercentageData.slice(1).reduce((max, state) => state.nice > max.nice ? state : max).state
+                                : "N/A"}
                             </span>
                           </div>
                         </CardContent>
@@ -467,7 +520,9 @@ export default function Dashboard() {
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-muted-foreground">Needs Attention</span>
                             <span className="font-semibold">
-                              {statePercentageData.reduce((max, state) => state.naughty > max.naughty ? state : max).state}
+                              {statePercentageData.length > 1
+                                ? statePercentageData.slice(1).reduce((max, state) => state.naughty > max.naughty ? state : max).state
+                                : "N/A"}
                             </span>
                           </div>
                         </CardContent>
@@ -476,7 +531,7 @@ export default function Dashboard() {
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-muted-foreground">Total States Analyzed</span>
-                            <span className="font-semibold">{statePercentageData.length}</span>
+                            <span className="font-semibold">{statePercentageData.length - 1}</span>
                           </div>
                         </CardContent>
                       </Card>

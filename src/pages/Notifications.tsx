@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Send, Bell } from "lucide-react";
+import { Send, Bell, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { apiService } from "@/services/api_service";
 import { BroadcastHistory, ApiError } from "@/services/api_types";
@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Notifications() {
   const [title, setTitle] = useState("");
@@ -28,19 +29,7 @@ export default function Notifications() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  const hasFetched = useRef(false);
-
-  const isInitialMount = useRef(true);
-
   useEffect(() => {
-    fetchBroadcastHistory();
-  }, []);
-
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
     fetchBroadcastHistory();
   }, [page, pageLimit]);
 
@@ -52,7 +41,7 @@ export default function Notifications() {
         limit: pageLimit === -1 ? 1000 : pageLimit,
       };
 
-      const response = await apiService.getBroadcastHistory();
+      const response = await apiService.getBroadcastHistory(params);
 
       if (response.success) {
         setHistory(response.data.data || []);
@@ -139,7 +128,12 @@ export default function Notifications() {
 
   return (
     <div className="max-w-4xl space-y-6 animate-fade-in">
-      <h1 className="text-3xl font-bold">Broadcast Management</h1>
+      <div>
+        <h1 className="text-3xl font-bold mb-2">Santa's Broadcasts</h1>
+        <p className="text-muted-foreground">
+          This message will be shared with all families using the app. Please send only when Santa has something meaningful to say.
+        </p>
+      </div>
 
       <Card className="shadow-card">
         <CardHeader>
@@ -196,6 +190,13 @@ export default function Notifications() {
             </Card>
           )}
 
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Users will receive: "You have received a new message from Santa. Tap to view"
+            </AlertDescription>
+          </Alert>
+
           <Button
             onClick={handleSend}
             className="w-full"
@@ -203,7 +204,7 @@ export default function Notifications() {
             disabled={loading}
           >
             <Send className="mr-2 h-4 w-4" />
-            {loading ? 'Sending...' : 'Send Broadcast'}
+            {loading ? 'Sending...' : "Send Santa's Broadcast"}
           </Button>
         </CardContent>
       </Card>
@@ -260,23 +261,77 @@ export default function Notifications() {
                   <div className="text-sm text-muted-foreground">
                     {getDisplayRange()}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Show</span>
-                    <Select
-                      value={pageLimit === -1 ? "all" : pageLimit.toString()}
-                      onValueChange={handleLimitChange}
-                    >
-                      <SelectTrigger className="w-[100px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="20">20</SelectItem>
-                        <SelectItem value="50">50</SelectItem>
-                        <SelectItem value="all">All</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <span className="text-sm text-muted-foreground">entries</span>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Show</span>
+                      <Select
+                        value={pageLimit === -1 ? "all" : pageLimit.toString()}
+                        onValueChange={handleLimitChange}
+                      >
+                        <SelectTrigger className="w-[100px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="all">All</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm text-muted-foreground">entries</span>
+                    </div>
+
+                    {pageLimit !== -1 && totalPages > 1 && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setPage((p) => Math.max(1, p - 1))}
+                          disabled={page === 1}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+
+                        {(() => {
+                          const windowSize = 5;
+                          let windowStart = page;
+                          let windowEnd = page + windowSize - 1;
+
+                          if (windowEnd > totalPages) {
+                            windowEnd = totalPages;
+                            windowStart = Math.max(1, windowEnd - windowSize + 1);
+                          }
+
+                          const pages = [];
+                          for (let i = windowStart; i <= windowEnd; i++) {
+                            pages.push(i);
+                          }
+
+                          return pages.map((p) => (
+                            <Button
+                              key={p}
+                              variant={p === page ? "default" : "outline"}
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => setPage(p)}
+                            >
+                              {p}
+                            </Button>
+                          ));
+                        })()}
+
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                          disabled={page === totalPages}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

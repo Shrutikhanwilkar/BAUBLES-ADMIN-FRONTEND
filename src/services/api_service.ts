@@ -511,8 +511,8 @@ class ApiService {
         return this.get<GetAdminsResponse>(API_ENDPOINTS.ADMIN.LIST, params);
     }
 
-    public async getAppVersion(): Promise<GetAppVersionResponse> {
-        return this.get<GetAppVersionResponse>(API_ENDPOINTS.APP_VERSION.GET);
+    public async getAppVersion(page: number = 1, limit: number = 10): Promise<GetAppVersionResponse> {
+        return this.get<GetAppVersionResponse>(`${API_ENDPOINTS.APP_VERSION.GET}?page=${page}&limit=${limit}`);
     }
 
     public async updateAppVersion(data: UpdateAppVersionRequest): Promise<UpdateAppVersionResponse> {
@@ -523,8 +523,8 @@ class ApiService {
         return this.post<SendBroadcastResponse>(API_ENDPOINTS.NOTIFICATION.BROADCAST, data);
     }
 
-    public async getBroadcastHistory(): Promise<GetBroadcastHistoryResponse> {
-        return this.get<GetBroadcastHistoryResponse>(API_ENDPOINTS.NOTIFICATION.HISTORY);
+    public async getBroadcastHistory(params?: { page?: number; limit?: number }): Promise<GetBroadcastHistoryResponse> {
+        return this.get<GetBroadcastHistoryResponse>(API_ENDPOINTS.NOTIFICATION.HISTORY, params);
     }
 
     public async updateUserStatus(id: string, status: string): Promise<UpdateUserStatusResponse> {

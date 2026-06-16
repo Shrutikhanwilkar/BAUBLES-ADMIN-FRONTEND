@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Star, TrendingUp, AlertTriangle, XCircle, Users, Award, TrendingDown, BarChart3, Trophy, Medal, Download, FileText, FileSpreadsheet, Loader2 } from "lucide-react";
+import { Star, TrendingUp, AlertTriangle, XCircle, Users, Award, TrendingDown, BarChart3, Trophy, Medal, Download, FileText, FileSpreadsheet, Loader2, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { apiService } from "@/services/api_service";
 import { Category } from "@/services/api_types";
@@ -94,6 +94,8 @@ export default function Reports() {
   const [totalChildren, setTotalChildren] = useState(0);
   const [avgNice, setAvgNice] = useState(0);
   const [avgNaughty, setAvgNaughty] = useState(0);
+  const chartSectionRef = useRef<HTMLDivElement>(null);
+
   const iconOptions = [
     { value: "Star", component: Star },
     { value: "TrendingUp", component: TrendingUp },
@@ -270,6 +272,14 @@ export default function Reports() {
       setChartLoading(false);
     }
   };
+
+  const handleStateClick = (state: string) => {
+    setSelectedState(state);
+    setTimeout(() => {
+      chartSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
   const chartData = realChartData.length > 0 ? realChartData : categories.map((category) => ({
     name: category.name,
     children: 0,
@@ -324,7 +334,9 @@ export default function Reports() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${exportType}_names_export_${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = exportType === "popular"
+        ? `top_20_common_names_export_${new Date().toISOString().split('T')[0]}.csv`
+        : `top_20_list_records_export_${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -344,7 +356,7 @@ export default function Reports() {
       const doc = new jsPDF();
 
       doc.setFontSize(18);
-      doc.text(exportType === "popular" ? 'Popular Names Report' : 'Behaviour Lists Report', 14, 22);
+      doc.text(exportType === "popular" ? 'Top 20 Common Names' : 'Top 20 List Records', 14, 22);
 
       doc.setFontSize(11);
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
@@ -389,7 +401,9 @@ export default function Reports() {
         });
       }
 
-      doc.save(`${exportType}_names_export_${new Date().toISOString().split('T')[0]}.pdf`);
+      doc.save(exportType === "popular"
+        ? `top_20_common_names_export_${new Date().toISOString().split('T')[0]}.pdf`
+        : `top_20_list_records_export_${new Date().toISOString().split('T')[0]}.pdf`);
 
       setIsExportDialogOpen(false);
       toast.success(`PDF exported successfully`);
@@ -403,8 +417,8 @@ export default function Reports() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Reports</h1>
-          <p className="text-sm text-muted-foreground mt-1">Comprehensive analysis of children's behaviour patterns</p>
+          <h1 className="text-3xl font-bold">Believer Records</h1>
+          <p className="text-sm text-muted-foreground mt-1">A snapshot of list patterns and kindness trends</p>
         </div>
       </div>
       {isLoading ? (
@@ -420,7 +434,8 @@ export default function Reports() {
             return (
               <Card
                 key={category._id}
-                className="shadow-card hover-scale transition-all cursor-pointer min-w-[200px] flex-shrink-0"
+                className="shadow-card hover:shadow-elevated transition-all duration-200 cursor-pointer min-w-[200px] flex-shrink-0 group border-l-4 relative"
+                style={{ borderLeftColor: category.color }}
                 onClick={() => handleCategoryClick(category._id)}
               >
                 <CardContent className="p-4">
@@ -431,7 +446,8 @@ export default function Reports() {
                     >
                       <IconComponent className="h-5 w-5" style={{ color: category.color }} />
                     </div>
-                    <h3 className="font-semibold text-base whitespace-nowrap">{category.name}</h3>
+                    <h3 className="font-semibold text-base whitespace-nowrap flex-1">{category.name}</h3>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                   </div>
                 </CardContent>
               </Card>
@@ -455,7 +471,7 @@ export default function Reports() {
                   <Users className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Children</p>
+                  <p className="text-sm text-muted-foreground">Total Believers</p>
                   <p className="text-2xl font-bold">{totalChildren}</p>
                 </div>
               </div>
@@ -469,7 +485,7 @@ export default function Reports() {
                   <Award className="h-5 w-5 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Nice Average</p>
+                  <p className="text-sm text-muted-foreground">Nice List Balance</p>
                   <p className="text-2xl font-bold">{avgNice}%</p>
                 </div>
               </div>
@@ -483,7 +499,7 @@ export default function Reports() {
                   <TrendingDown className="h-5 w-5 text-red-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Naughty Average</p>
+                  <p className="text-sm text-muted-foreground">Naughty List Balance</p>
                   <p className="text-2xl font-bold">{avgNaughty}%</p>
                 </div>
               </div>
@@ -494,27 +510,262 @@ export default function Reports() {
 
       <Card className="shadow-card">
         <CardContent className="p-6">
-          <Tabs defaultValue="popular-names" className="w-full">
+          <Tabs defaultValue="behavior-lists" className="w-full">
             <TabsList className="grid w-full grid-cols-3 bg-muted/50">
-              <TabsTrigger
-                value="popular-names"
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Popular Names
-              </TabsTrigger>
               <TabsTrigger
                 value="behavior-lists"
                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
               >
-                Behaviour Lists
+                List Records
               </TabsTrigger>
               <TabsTrigger
                 value="state-analysis"
                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
               >
-                State Analysis
+                Australia Snapshot
+              </TabsTrigger>
+              <TabsTrigger
+                value="popular-names"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                Common Names
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="behavior-lists" className="space-y-4 mt-6">
+              <div className="flex justify-end mb-4">
+                <Button onClick={() => handleOpenExportDialog("behavior")} disabled={behaviourLoading}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+              </div>
+
+              {behaviourLoading ? (
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <TrendingDown className="h-5 w-5 text-red-600" />
+                        <h3 className="text-lg font-semibold">Top 20 Naughty List</h3>
+                      </div>
+                    </div>
+                    <NameListSkeleton />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Award className="h-5 w-5 text-green-600" />
+                        <h3 className="text-lg font-semibold">Top 20 Nice List</h3>
+                      </div>
+                    </div>
+                    <NameListSkeleton />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <TrendingDown className="h-5 w-5 text-red-600" />
+                        <h3 className="text-lg font-semibold">Top 20 Naughty List</h3>
+                      </div>
+                    </div>
+                    <div className="space-y-1 max-h-[500px] overflow-y-auto border rounded-lg">
+                      {naughtyNameData.length > 0 ? naughtyNameData.map((item) => (
+                        <div
+                          key={item.rank}
+                          className="flex items-center justify-between p-3 hover:bg-red-50 transition-colors border-b last:border-b-0"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-bold text-red-600 w-5 text-center">{item.rank}</span>
+                            <span className="font-medium capitalize">{item.name}</span>
+                          </div>
+                          <Badge variant="outline" className="text-red-600 border-red-300">{item.count}</Badge>
+                        </div>
+                      )) : (
+                        <div className="p-8 text-center text-muted-foreground">No data available</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Award className="h-5 w-5 text-green-600" />
+                        <h3 className="text-lg font-semibold">Top 20 Nice List</h3>
+                      </div>
+                    </div>
+                    <div className="space-y-1 max-h-[500px] overflow-y-auto border rounded-lg">
+                      {niceNameData.length > 0 ? niceNameData.map((item) => (
+                        <div
+                          key={item.rank}
+                          className="flex items-center justify-between p-3 hover:bg-green-50 transition-colors border-b last:border-b-0"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-bold text-green-600 w-5 text-center">{item.rank}</span>
+                            <span className="font-medium capitalize">{item.name}</span>
+                          </div>
+                          <Badge variant="outline" className="text-green-600 border-green-300">{item.count}</Badge>
+                        </div>
+                      )) : (
+                        <div className="p-8 text-center text-muted-foreground">No data available</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="state-analysis" className="mt-6">
+              {stateLoading ? (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold">List Summary Across States</h3>
+                  </div>
+                  <div className="h-[450px] flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                </div>
+              ) : statePercentageData.length > 0 ? (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold">List Summary Across States</h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setViewMode("chart")}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === "chart" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"}`}
+                      >
+                        Bar Chart
+                      </button>
+                      <button
+                        onClick={() => setViewMode("pie")}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === "pie" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"}`}
+                      >
+                        Overview
+                      </button>
+                    </div>
+                  </div>
+
+                  {viewMode === "chart" ? (
+                    <>
+                      <ResponsiveContainer width="100%" height={450}>
+                        <BarChart data={statePercentageData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="state"
+                            angle={-45}
+                            textAnchor="end"
+                            height={115}
+                            style={{ fontSize: '11px' }}
+                          />
+                          <YAxis label={{ value: 'Percentage (%)', angle: -90, position: 'insideLeft' }} />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#fff',
+                              border: '1px solid #f3f4f6',
+                              borderRadius: '8px',
+                            }}
+                            formatter={(value) => `${value}%`}
+                          />
+                          <Legend />
+                          <Bar dataKey="naughty" fill="#F44336" radius={[8, 8, 0, 0]} name="Naughty %" />
+                          <Bar dataKey="nice" fill="#4CAF50" radius={[8, 8, 0, 0]} name="Nice %" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </>
+                  ) : (
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div>
+                        <h4 className="text-sm font-semibold mb-3">Overall Distribution</h4>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={pieData}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              label={({ name, value }) => `${name}: ${value}%`}
+                              outerRadius={100}
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              {pieData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(value) => `${value}%`}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-semibold mb-3">Statistics Summary</h4>
+                        <div className="space-y-3">
+                          <Card>
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">Best Performing State</span>
+                                <span className="font-semibold">
+                                  {statePercentageData.reduce((max, state) => state.nice > max.nice ? state : max).state}
+                                </span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">Needs Attention</span>
+                                <span className="font-semibold">
+                                  {statePercentageData.reduce((max, state) => state.naughty > max.naughty ? state : max).state}
+                                </span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">Total States Analyzed</span>
+                                <span className="font-semibold">{statePercentageData.length}</span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    {statePercentageData.map((state) => (
+                      <Card
+                        key={state.state}
+                        className="cursor-pointer hover:shadow-lg transition-all hover-scale"
+                        onClick={() => handleStateClick(state.state)}
+                      >
+                        <CardContent className="p-4">
+                          <h4 className="font-semibold mb-2 text-sm">{state.state}</h4>
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-green-600">Nice</span>
+                              <span className="font-bold">{state.nice}%</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-red-600">Naughty</span>
+                              <span className="font-bold">{state.naughty}%</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 text-center text-muted-foreground">
+                  No state data available
+                </div>
+              )}
+            </TabsContent>
 
             <TabsContent value="popular-names" className="space-y-4 mt-6">
               <div className="flex justify-end mb-4">
@@ -608,333 +859,102 @@ export default function Reports() {
                 </div>
               )}
             </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
-            <TabsContent value="behavior-lists" className="space-y-4 mt-6">
-              <div className="flex justify-end mb-4">
-                <Button onClick={() => handleOpenExportDialog("behavior")} disabled={behaviourLoading}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Export
-                </Button>
-              </div>
+      <Card className="shadow-card" ref={chartSectionRef}>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold">Santa's List Snapshot by State</h2>
+            <Select value={selectedState} onValueChange={setSelectedState}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Select State" />
+              </SelectTrigger>
+              <SelectContent>
+                {STATES.map((state) => (
+                  <SelectItem key={state} value={state}>
+                    {state}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-              {behaviourLoading ? (
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <TrendingDown className="h-5 w-5 text-red-600" />
-                        <h3 className="text-lg font-semibold">Top 20 Naughty List</h3>
-                      </div>
-                    </div>
-                    <NameListSkeleton />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <Award className="h-5 w-5 text-green-600" />
-                        <h3 className="text-lg font-semibold">Top 20 Nice List</h3>
-                      </div>
-                    </div>
-                    <NameListSkeleton />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <TrendingDown className="h-5 w-5 text-red-600" />
-                        <h3 className="text-lg font-semibold">Top 20 Naughty List</h3>
-                      </div>
-                    </div>
-                    <div className="space-y-1 max-h-[500px] overflow-y-auto border rounded-lg">
-                      {naughtyNameData.length > 0 ? naughtyNameData.map((item) => (
-                        <div
-                          key={item.rank}
-                          className="flex items-center justify-between p-3 hover:bg-red-50 transition-colors border-b last:border-b-0"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm font-bold text-red-600 w-5 text-center">{item.rank}</span>
-                            <span className="font-medium capitalize">{item.name}</span>
-                          </div>
-                          <Badge variant="outline" className="text-red-600 border-red-300">{item.count}</Badge>
-                        </div>
-                      )) : (
-                        <div className="p-8 text-center text-muted-foreground">No data available</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <Award className="h-5 w-5 text-green-600" />
-                        <h3 className="text-lg font-semibold">Top 20 Nice List</h3>
-                      </div>
-                    </div>
-                    <div className="space-y-1 max-h-[500px] overflow-y-auto border rounded-lg">
-                      {niceNameData.length > 0 ? niceNameData.map((item) => (
-                        <div
-                          key={item.rank}
-                          className="flex items-center justify-between p-3 hover:bg-green-50 transition-colors border-b last:border-b-0"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm font-bold text-green-600 w-5 text-center">{item.rank}</span>
-                            <span className="font-medium capitalize">{item.name}</span>
-                          </div>
-                          <Badge variant="outline" className="text-green-600 border-green-300">{item.count}</Badge>
-                        </div>
-                      )) : (
-                        <div className="p-8 text-center text-muted-foreground">No data available</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="state-analysis" className="mt-6">
-              {stateLoading ? (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">Behaviour Distribution Across States</h3>
-                  </div>
-                  <div className="h-[450px] flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                </div>
-              ) : statePercentageData.length > 0 ? (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">Behaviour Distribution Across States</h3>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setViewMode("chart")}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === "chart" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"}`}
-                      >
-                        Bar Chart
-                      </button>
-                      <button
-                        onClick={() => setViewMode("pie")}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === "pie" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"}`}
-                      >
-                        Overview
-                      </button>
-                    </div>
-</div>
-            {viewMode === "chart" ? (
-              <>
-                <ResponsiveContainer width="100%" height={450}>
-                  <BarChart data={statePercentageData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="state"
-                      angle={-45}
-                      textAnchor="end"
-                      height={115}
-                      style={{ fontSize: '11px' }}
-                    />
-                    <YAxis label={{ value: 'Percentage (%)', angle: -90, position: 'insideLeft' }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#fff',
-                        border: '1px solid #f3f4f6',
-                        borderRadius: '8px',
-                      }}
-                      formatter={(value) => `${value}%`}
-                    />
-                    <Legend />
-                    <Bar dataKey="naughty" fill="#F44336" radius={[8, 8, 0, 0]} name="Naughty %" />
-                    <Bar dataKey="nice" fill="#4CAF50" radius={[8, 8, 0, 0]} name="Nice %" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </>
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2">
-                <div>
-                  <h4 className="text-sm font-semibold mb-3">Overall Distribution</h4>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, value }) => `${name}: ${value}%`}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value) => `${value}%`}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-semibold mb-3">Statistics Summary</h4>
-                  <div className="space-y-3">
-                    <Card>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Best Performing State</span>
-                          <span className="font-semibold">
-                            {statePercentageData.reduce((max, state) => state.nice > max.nice ? state : max).state}
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Needs Attention</span>
-                          <span className="font-semibold">
-                            {statePercentageData.reduce((max, state) => state.naughty > max.naughty ? state : max).state}
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Total States Analyzed</span>
-                          <span className="font-semibold">{statePercentageData.length}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {statePercentageData.map((state) => (
-                <Card key={state.state}>
-                  <CardContent className="p-4">
-                    <h4 className="font-semibold mb-2 text-sm">{state.state}</h4>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-green-600">Nice</span>
-                        <span className="font-bold">{state.nice}%</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-red-600">Naughty</span>
-                        <span className="font-bold">{state.naughty}%</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+          {chartLoading ? (
+            <div className="h-[400px] flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={chartData} barSize={85}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #f3f4f6',
+                    borderRadius: '8px',
+                  }}
+                />
+                <Bar
+                  dataKey="children"
+                  radius={[8, 8, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Export {exportType === "popular" ? "Top 20 Common Names" : "Top 20 List Records"} Data</DialogTitle>
+            <DialogDescription>
+              Choose the format you want to export the data
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Button
+              variant="outline"
+              className="h-20 flex flex-col items-center justify-center gap-2"
+              onClick={handleExportCSV}
+              disabled={exporting}
+            >
+              {exporting ? (
+                <Loader2 className="h-8 w-8 text-green-600 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="h-8 w-8 text-green-600" />
+              )}
+              <span className="font-semibold">
+                {exporting ? "Exporting..." : "Export as CSV"}
+              </span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-20 flex flex-col items-center justify-center gap-2"
+              onClick={handleExportPDF}
+              disabled={exporting}
+            >
+              {exporting ? (
+                <Loader2 className="h-8 w-8 text-red-600 animate-spin" />
+              ) : (
+                <FileText className="h-8 w-8 text-red-600" />
+              )}
+              <span className="font-semibold">
+                {exporting ? "Exporting..." : "Export as PDF"}
+              </span>
+            </Button>
           </div>
-          ) : (
-          <div className="p-8 text-center text-muted-foreground">
-            No state data available
-          </div>
-          )}
-        </TabsContent>
-      </Tabs>
-    </CardContent>
-  </Card >
-
-  <Card className="shadow-card">
-    <CardContent className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold">Children Distribution by Category</h2>
-        <Select value={selectedState} onValueChange={setSelectedState}>
-          <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="Select State" />
-          </SelectTrigger>
-          <SelectContent>
-            {STATES.map((state) => (
-              <SelectItem key={state} value={state}>
-                {state}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {chartLoading ? (
-        <div className="h-[400px] flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      ) : (
-        <ResponsiveContainer width="100%" height={400}>
-          <BarChart data={chartData} barSize={85}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#fff',
-                border: '1px solid #f3f4f6',
-                borderRadius: '8px',
-              }}
-            />
-            <Bar
-              dataKey="children"
-              radius={[8, 8, 0, 0]}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      )}
-    </CardContent>
-  </Card>
-
-  <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
-    <DialogContent className="sm:max-w-[425px]">
-      <DialogHeader>
-        <DialogTitle>Export {exportType === "popular" ? "Popular Names" : "Behaviour Lists"} Data</DialogTitle>
-        <DialogDescription>
-          Choose the format you want to export the data
-        </DialogDescription>
-      </DialogHeader>
-      <div className="grid gap-4 py-4">
-        <Button
-          variant="outline"
-          className="h-20 flex flex-col items-center justify-center gap-2"
-          onClick={handleExportCSV}
-          disabled={exporting}
-        >
-          {exporting ? (
-            <Loader2 className="h-8 w-8 text-green-600 animate-spin" />
-          ) : (
-            <FileSpreadsheet className="h-8 w-8 text-green-600" />
-          )}
-          <span className="font-semibold">
-            {exporting ? "Exporting..." : "Export as CSV"}
-          </span>
-        </Button>
-        <Button
-          variant="outline"
-          className="h-20 flex flex-col items-center justify-center gap-2"
-          onClick={handleExportPDF}
-          disabled={exporting}
-        >
-          {exporting ? (
-            <Loader2 className="h-8 w-8 text-red-600 animate-spin" />
-          ) : (
-            <FileText className="h-8 w-8 text-red-600" />
-          )}
-          <span className="font-semibold">
-            {exporting ? "Exporting..." : "Export as PDF"}
-          </span>
-        </Button>
-      </div>
-      <DialogFooter>
-        <Button variant="outline" onClick={() => setIsExportDialogOpen(false)} disabled={exporting}>
-          Cancel
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
-</div >
-);
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsExportDialogOpen(false)} disabled={exporting}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }

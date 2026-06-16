@@ -450,6 +450,7 @@ export interface DashboardStats {
     childrenCount: number;
     maleChildren: number;
     femaleChildren: number;
+    otherChildren: number
     giftCount: number;
     musicCount: number;
     dashboardVideo?: {
@@ -741,7 +742,13 @@ export interface UpdateAppVersionResponse {
 export interface GetAppVersionResponse {
     success: boolean;
     message: string;
-    data: AppVersion;
+    data: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+        data: AppVersion[];
+    };
 }
 
 export interface SendBroadcastRequest {

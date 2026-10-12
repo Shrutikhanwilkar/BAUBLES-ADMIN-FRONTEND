@@ -379,9 +379,17 @@ export default function UsersPage() {
     if (pageLimit === -1) {
       return `Showing all ${totalRecords} entries`;
     }
-    const start = (page - 1) * pageLimit + 1;
+    const start = totalRecords === 0 ? 0 : (page - 1) * pageLimit + 1;
     const end = Math.min(page * pageLimit, totalRecords);
     return `Showing ${start}-${end} of ${totalRecords} entries`;
+  };
+
+  const getCompactDisplayRange = () => {
+    if (totalRecords === 0) return "0 of 0";
+    if (pageLimit === -1) return `1–${totalRecords.toLocaleString()} of ${totalRecords.toLocaleString()}`;
+    const start = (page - 1) * pageLimit + 1;
+    const end = Math.min(page * pageLimit, totalRecords);
+    return `${start.toLocaleString()}–${end.toLocaleString()} of ${totalRecords.toLocaleString()}`;
   };
 
   return (
@@ -401,27 +409,55 @@ export default function UsersPage() {
               <Users className="h-5 w-5" />
               List of Parent Helpers
             </CardTitle>
-            <div className="flex gap-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name, email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                  disabled={loading}
-                />
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex gap-4 flex-1 min-w-[280px]">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, email..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                    disabled={loading}
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[220px]">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Parent Helpers</SelectItem>
+                    <SelectItem value="active">Active Parent Helpers</SelectItem>
+                    <SelectItem value="inactive">Inactive Parent Helpers</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Parent Helpers</SelectItem>
-                  <SelectItem value="active">Active Parent Helpers</SelectItem>
-                  <SelectItem value="inactive">Inactive Parent Helpers</SelectItem>
-                </SelectContent>
-              </Select>
+
+              {!loading && totalRecords > 0 && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground whitespace-nowrap pl-2 border-l">
+                  <span>{getCompactDisplayRange()}</span>
+                  <div className="flex items-center">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
             {users.length > 0 && (
               <div className="flex items-center gap-2">

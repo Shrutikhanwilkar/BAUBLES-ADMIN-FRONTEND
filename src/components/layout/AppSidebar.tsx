@@ -108,9 +108,9 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
-      <SidebarContent className={`${isCollapsed ? 'px-2' : 'px-0'}`}>
-        <div className={`flex items-center transition-all duration-200 ${isCollapsed ? 'py-6 justify-center' : 'px-6 py-6 gap-3'}`}>
-          <div className="w-14 h-14 rounded-xl bg-[#dc2626] flex items-center justify-center shadow-md shrink-0">
+      <SidebarContent className="px-0">
+        <div className={`flex items-center transition-all duration-200 ${isCollapsed ? 'py-5 justify-center px-0' : 'px-6 py-6 gap-3'}`}>
+          <div className={`${isCollapsed ? 'w-11 h-11 rounded-xl p-1.5' : 'w-14 h-14 rounded-xl p-2'} bg-[#dc2626] flex items-center justify-center shadow-md shrink-0 transition-all duration-200 overflow-hidden`}>
             <img
               src="/logo.png"
               alt="Baubles Logo"
@@ -128,9 +128,9 @@ export function AppSidebar() {
             </div>
           )}
         </div>
-        <SidebarGroup>
+        <SidebarGroup className={isCollapsed ? 'px-1.5 py-1' : 'p-2'}>
           <SidebarGroupContent>
-            <SidebarMenu className={`gap-1 ${isCollapsed ? 'px-0' : 'px-3'}`}>
+            <SidebarMenu className={`gap-1.5 ${isCollapsed ? 'px-0 items-center' : 'px-3'}`}>
               {menuItems.map((item) => {
                 if (item.isDropdown && item.subItems) {
                   const isOpen = openDropdowns[item.title];
@@ -139,15 +139,15 @@ export function AppSidebar() {
                   );
 
                   return (
-                    <div key={item.title}>
-                      <SidebarMenuItem>
+                    <div key={item.title} className="w-full">
+                      <SidebarMenuItem className={isCollapsed ? 'flex justify-center' : ''}>
                         <SidebarMenuButton
                           size="lg"
                           tooltip={isCollapsed ? item.title : undefined}
                           className={`${isAnySubItemActive
                             ? "bg-[#dc2626] text-white hover:bg-[#dc2626] hover:text-white shadow-sm"
                             : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                            } rounded-lg transition-all duration-200 ${isCollapsed ? 'justify-center' : ''} cursor-pointer`}
+                            } rounded-lg transition-all duration-200 ${isCollapsed ? 'justify-center !size-10 !p-0 mx-auto' : ''} cursor-pointer`}
                           onClick={() => toggleDropdown(item.title)}
                         >
                           <div className={`flex items-center w-full ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
@@ -196,7 +196,7 @@ export function AppSidebar() {
 
                 const isActive = location.pathname === item.url || location.pathname.startsWith(item.url + '/');
                 return (
-                  <SidebarMenuItem key={item.title}>
+                  <SidebarMenuItem key={item.title} className={isCollapsed ? 'flex justify-center' : ''}>
                     <SidebarMenuButton
                       asChild
                       isActive={isActive}
@@ -205,9 +205,9 @@ export function AppSidebar() {
                       className={`${isActive
                         ? "bg-[#dc2626] text-white hover:bg-[#dc2626] hover:text-white data-[active=true]:bg-[#dc2626] data-[active=true]:text-white shadow-sm"
                         : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                        } rounded-lg transition-all duration-200 ${isCollapsed ? 'justify-center' : ''}`}
+                        } rounded-lg transition-all duration-200 ${isCollapsed ? 'justify-center !size-10 !p-0 mx-auto' : ''}`}
                     >
-                      <NavLink to={item.url} onClick={(e) => handleNavClick(e, item.url)} className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+                      <NavLink to={item.url} onClick={(e) => handleNavClick(e, item.url)} className={`flex items-center ${isCollapsed ? 'justify-center w-full h-full' : 'gap-3'}`}>
                         <item.icon className="h-5 w-5 shrink-0" />
                         {!isCollapsed && <span className="font-medium text-[15px]">{item.title}</span>}
                       </NavLink>

@@ -92,12 +92,38 @@ export default function Support() {
 
       const response = await apiService.getContacts(params);
 
-      if (response.success) {
-        setContacts(response.data.contacts);
-        setResolvedCount(response.data.resolvedCount);
-        setUnresolvedCount(response.data.unresolvedCount);
-        setTotalRecords(response.data.pagination.total);
-        setTotalPages(response.data.pagination.totalPages);
+      if (response.success && response.data) {
+        const rawContacts = response.data.contacts || [];
+        const resCount = response.data.resolvedCount ?? 0;
+        const unresCount = response.data.unresolvedCount ?? 0;
+        setResolvedCount(resCount);
+        setUnresolvedCount(unresCount);
+
+        const pagination = response.data.pagination;
+        const total = pagination?.total 
+          ?? (response.data as any)?.total 
+          ?? (response.data as any)?.totalRecords 
+          ?? (activeTab === "resolved" ? resCount : unresCount) 
+          ?? rawContacts.length;
+
+        const calculatedPages = pageLimit === -1 
+          ? 1 
+          : Math.max(1, Math.ceil(total / pageLimit));
+        const pages = pagination?.totalPages 
+          ?? (response.data as any)?.totalPages 
+          ?? calculatedPages;
+
+        setTotalRecords(total);
+        setTotalPages(pages);
+
+        // If server returns more items than pageLimit, slice client-side
+        if (pageLimit !== -1 && rawContacts.length > pageLimit) {
+          const startIndex = (page - 1) * pageLimit;
+          const endIndex = startIndex + pageLimit;
+          setContacts(rawContacts.slice(startIndex, endIndex));
+        } else {
+          setContacts(rawContacts);
+        }
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to fetch contacts");
@@ -223,9 +249,20 @@ export default function Support() {
     if (pageLimit === -1) {
       return `Showing all ${totalRecords} entries`;
     }
+    if (totalRecords === 0) {
+      return `Showing 0 entries`;
+    }
     const start = (page - 1) * pageLimit + 1;
     const end = Math.min(page * pageLimit, totalRecords);
     return `Showing ${start}-${end} of ${totalRecords} entries`;
+  };
+
+  const getCompactDisplayRange = () => {
+    if (totalRecords === 0) return "0 of 0";
+    if (pageLimit === -1) return `1–${totalRecords.toLocaleString()} of ${totalRecords.toLocaleString()}`;
+    const start = (page - 1) * pageLimit + 1;
+    const end = Math.min(page * pageLimit, totalRecords);
+    return `${start.toLocaleString()}–${end.toLocaleString()} of ${totalRecords.toLocaleString()}`;
   };
 
   const isVideoFile = (url: string) => {
@@ -291,26 +328,54 @@ export default function Support() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2 min-w-[200px]">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <Select
-            value={selectedType}
-            onValueChange={(value) => {
-              setSelectedType(value as ContactType | "all");
-              setPage(1);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by type" />
-            </SelectTrigger>
-            <SelectContent>
-              {contactTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type === "all" ? "All Types" : type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2 min-w-[200px]">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select
+              value={selectedType}
+              onValueChange={(value) => {
+                setSelectedType(value as ContactType | "all");
+                setPage(1);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                {contactTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type === "all" ? "All Types" : type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {!loading && totalRecords > 0 && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground whitespace-nowrap pl-2 border-l">
+              <span>{getCompactDisplayRange()}</span>
+              <div className="flex items-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -541,8 +606,8 @@ export default function Support() {
             </Card>
           )}
 
-          {!loading && contacts.length > 0 && (
-            <div className="flex items-center justify-between mt-6 pt-4 border-t">
+          {!loading && (totalRecords > 0 || contacts.length > 0) && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t">
               <div className="text-sm text-muted-foreground">
                 {getDisplayRange()}
               </div>
@@ -553,7 +618,7 @@ export default function Support() {
                     value={pageLimit === -1 ? "all" : pageLimit.toString()}
                     onValueChange={handleLimitChange}
                   >
-                    <SelectTrigger className="w-[100px]">
+                    <SelectTrigger className="w-[85px] h-9 rounded-lg">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -566,12 +631,12 @@ export default function Support() {
                   <span className="text-sm text-muted-foreground">entries</span>
                 </div>
 
-                {pageLimit !== -1 && totalPages > 1 && (
-                  <div className="flex items-center gap-1">
+                {pageLimit !== -1 && totalPages >= 1 && (
+                  <div className="flex items-center gap-1.5">
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-9 w-9 rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={page === 1}
                     >
@@ -580,8 +645,8 @@ export default function Support() {
 
                     {(() => {
                       const windowSize = 5;
-                      let windowStart = page;
-                      let windowEnd = page + windowSize - 1;
+                      let windowStart = Math.max(1, page - Math.floor(windowSize / 2));
+                      let windowEnd = windowStart + windowSize - 1;
 
                       if (windowEnd > totalPages) {
                         windowEnd = totalPages;
@@ -598,7 +663,11 @@ export default function Support() {
                           key={p}
                           variant={p === page ? "default" : "outline"}
                           size="icon"
-                          className="h-8 w-8"
+                          className={`h-9 w-9 rounded-lg font-medium transition-colors ${
+                            p === page
+                              ? "bg-primary text-primary-foreground hover:bg-primary/90 border-transparent shadow-sm"
+                              : "border border-border bg-background hover:bg-muted text-foreground"
+                          }`}
                           onClick={() => setPage(p)}
                         >
                           {p}
@@ -609,7 +678,7 @@ export default function Support() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-9 w-9 rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
                       onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                       disabled={page === totalPages}
                     >

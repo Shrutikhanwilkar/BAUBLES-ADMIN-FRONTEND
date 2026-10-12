@@ -149,11 +149,14 @@ export default function MusicLibrary() {
       }
 
       if (audioBooksResponse.success) {
-        setAudioBooks(audioBooksResponse.data.music);
-        if (audioBooksResponse.data.pagination) {
-          setTotalRecords(audioBooksResponse.data.pagination.total);
-          setTotalPages(audioBooksResponse.data.pagination.totalPages);
-        }
+        const rawMusic = audioBooksResponse.data.music || [];
+        setAudioBooks(rawMusic);
+        const pagination = audioBooksResponse.data.pagination;
+        const total = pagination?.total ?? (audioBooksResponse.data as any)?.total ?? rawMusic.length;
+        const calculatedPages = pageLimit === -1 ? 1 : Math.max(1, Math.ceil(total / pageLimit));
+        const pages = pagination?.totalPages ?? (audioBooksResponse.data as any)?.totalPages ?? calculatedPages;
+        setTotalRecords(total);
+        setTotalPages(pages);
       }
     } catch (error) {
       const apiError = error as ApiError;
@@ -181,10 +184,20 @@ export default function MusicLibrary() {
 
       const response = await apiService.getAudioBooks(params);
       if (response.success) {
-        setAudioBooks(response.data.music);
-        if (response.data.pagination) {
-          setTotalRecords(response.data.pagination.total);
-          setTotalPages(response.data.pagination.totalPages);
+        const rawMusic = response.data.music || [];
+        const pagination = response.data.pagination;
+        const total = pagination?.total ?? (response.data as any)?.total ?? rawMusic.length;
+        const calculatedPages = pageLimit === -1 ? 1 : Math.max(1, Math.ceil(total / pageLimit));
+        const pages = pagination?.totalPages ?? (response.data as any)?.totalPages ?? calculatedPages;
+        setTotalRecords(total);
+        setTotalPages(pages);
+
+        if (pageLimit !== -1 && rawMusic.length > pageLimit) {
+          const startIndex = (currentPage - 1) * pageLimit;
+          const endIndex = startIndex + pageLimit;
+          setAudioBooks(rawMusic.slice(startIndex, endIndex));
+        } else {
+          setAudioBooks(rawMusic);
         }
       }
     } catch (error) {
@@ -417,9 +430,20 @@ export default function MusicLibrary() {
     if (pageLimit === -1) {
       return `Showing all ${totalRecords} entries`;
     }
+    if (totalRecords === 0) {
+      return `Showing 0 entries`;
+    }
     const start = (currentPage - 1) * pageLimit + 1;
     const end = Math.min(currentPage * pageLimit, totalRecords);
     return `Showing ${start}-${end} of ${totalRecords} entries`;
+  };
+
+  const getCompactDisplayRange = () => {
+    if (totalRecords === 0) return "0 of 0";
+    if (pageLimit === -1) return `1–${totalRecords.toLocaleString()} of ${totalRecords.toLocaleString()}`;
+    const start = (currentPage - 1) * pageLimit + 1;
+    const end = Math.min(currentPage * pageLimit, totalRecords);
+    return `${start.toLocaleString()}–${end.toLocaleString()} of ${totalRecords.toLocaleString()}`;
   };
 
   return (
@@ -436,27 +460,55 @@ export default function MusicLibrary() {
 
       <Card className="shadow-card">
         <CardContent className="p-6">
-          <div className="flex gap-4 mb-4">
-            <Input
-              placeholder="Search messages in the library..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1"
-            />
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Filter by category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category._id} value={category._id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={handleSearch}>Search</Button>
+          <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+            <div className="flex gap-4 flex-1 min-w-[280px]">
+              <Input
+                placeholder="Search messages in the library..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1"
+              />
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category._id} value={category._id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={handleSearch}>Search</Button>
+            </div>
+
+            {!isLoading && totalRecords > 0 && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground whitespace-nowrap pl-2 border-l">
+                <span>{getCompactDisplayRange()}</span>
+                <div className="flex items-center">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -567,8 +619,8 @@ export default function MusicLibrary() {
             </table>
           </div>
 
-          {!isLoading && audioBooks.length > 0 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t">
+          {!isLoading && (totalRecords > 0 || audioBooks.length > 0) && (
+            <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 border-t gap-4">
               <div className="text-sm text-muted-foreground">
                 {getDisplayRange()}
               </div>
@@ -579,7 +631,7 @@ export default function MusicLibrary() {
                     value={pageLimit === -1 ? "all" : pageLimit.toString()}
                     onValueChange={handleLimitChange}
                   >
-                    <SelectTrigger className="w-[100px]">
+                    <SelectTrigger className="w-[85px] h-9 rounded-lg">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -592,12 +644,12 @@ export default function MusicLibrary() {
                   <span className="text-sm text-muted-foreground">entries</span>
                 </div>
 
-                {pageLimit !== -1 && totalPages > 1 && (
-                  <div className="flex items-center gap-1">
+                {pageLimit !== -1 && totalPages >= 1 && (
+                  <div className="flex items-center gap-1.5">
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-9 w-9 rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
                     >
@@ -606,8 +658,8 @@ export default function MusicLibrary() {
 
                     {(() => {
                       const windowSize = 5;
-                      let windowStart = currentPage;
-                      let windowEnd = currentPage + windowSize - 1;
+                      let windowStart = Math.max(1, currentPage - Math.floor(windowSize / 2));
+                      let windowEnd = windowStart + windowSize - 1;
 
                       if (windowEnd > totalPages) {
                         windowEnd = totalPages;
@@ -624,7 +676,11 @@ export default function MusicLibrary() {
                           key={p}
                           variant={p === currentPage ? "default" : "outline"}
                           size="icon"
-                          className="h-8 w-8"
+                          className={`h-9 w-9 rounded-lg font-medium transition-colors ${
+                            p === currentPage
+                              ? "bg-primary text-primary-foreground hover:bg-primary/90 border-transparent shadow-sm"
+                              : "border border-border bg-background hover:bg-muted text-foreground"
+                          }`}
                           onClick={() => setCurrentPage(p)}
                         >
                           {p}
@@ -635,7 +691,7 @@ export default function MusicLibrary() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-9 w-9 rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
                     >

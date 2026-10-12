@@ -421,41 +421,6 @@ export default function Reports() {
           <p className="text-sm text-muted-foreground mt-1">A snapshot of list patterns and kindness trends</p>
         </div>
       </div>
-      {isLoading ? (
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          {[...Array(6)].map((_, index) => (
-            <CategorySkeleton key={index} />
-          ))}
-        </div>
-      ) : (
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          {categories.map((category) => {
-            const IconComponent = getIconComponent(category.visibilityRank);
-            return (
-              <Card
-                key={category._id}
-                className="shadow-card hover:shadow-elevated transition-all duration-200 cursor-pointer min-w-[200px] flex-shrink-0 group border-l-4 relative"
-                style={{ borderLeftColor: category.color }}
-                onClick={() => handleCategoryClick(category._id)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: category.color + '30' }}
-                    >
-                      <IconComponent className="h-5 w-5" style={{ color: category.color }} />
-                    </div>
-                    <h3 className="font-semibold text-base whitespace-nowrap flex-1">{category.name}</h3>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0" />
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
       {statsLoading ? (
         <div className="grid gap-6 md:grid-cols-3">
           <StatCardSkeleton />
@@ -505,6 +470,41 @@ export default function Reports() {
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex gap-4 overflow-x-auto pb-2">
+          {[...Array(6)].map((_, index) => (
+            <CategorySkeleton key={index} />
+          ))}
+        </div>
+      ) : (
+        <div className="flex gap-4 overflow-x-auto pb-2">
+          {categories.map((category) => {
+            const IconComponent = getIconComponent(category.visibilityRank);
+            return (
+              <Card
+                key={category._id}
+                className="shadow-card hover:shadow-elevated transition-all duration-200 cursor-pointer min-w-[200px] flex-shrink-0 group border-l-4 relative"
+                style={{ borderLeftColor: category.color }}
+                onClick={() => handleCategoryClick(category._id)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: category.color + '30' }}
+                    >
+                      <IconComponent className="h-5 w-5" style={{ color: category.color }} />
+                    </div>
+                    <h3 className="font-semibold text-base whitespace-nowrap flex-1">{category.name}</h3>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 

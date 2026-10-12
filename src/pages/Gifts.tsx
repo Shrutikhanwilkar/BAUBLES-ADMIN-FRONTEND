@@ -538,14 +538,6 @@ export default function Gifts() {
           </PopoverTrigger>
           <PopoverContent className="w-48 p-2" align="end">
             <div className="flex flex-col gap-1">
-              <Button
-                variant="ghost"
-                className="justify-start"
-                onClick={() => handleOpenDialog()}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Gift
-              </Button>
               {isSuperAdmin && (
                 <Button
                   variant="ghost"
@@ -556,6 +548,14 @@ export default function Gifts() {
                   Create Package
                 </Button>
               )}
+              <Button
+                variant="ghost"
+                className="justify-start"
+                onClick={() => handleOpenDialog()}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Gift
+              </Button>
             </div>
           </PopoverContent>
         </Popover>

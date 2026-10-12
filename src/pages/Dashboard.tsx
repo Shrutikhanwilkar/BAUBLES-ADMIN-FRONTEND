@@ -84,8 +84,12 @@ export default function Dashboard() {
       setStateLoading(true);
       const response = await apiService.getStateReport();
       if (response.success) {
-        const allStatesNice = response.data.data.reduce((sum, state) => sum + state.nice, 0);
-        const allStatesNaughty = response.data.data.reduce((sum, state) => sum + state.naughty, 0);
+        const allStatesNice = response.data.totalNice !== undefined 
+          ? response.data.totalNice 
+          : response.data.data.reduce((sum, state) => sum + state.nice, 0);
+        const allStatesNaughty = response.data.totalNaughty !== undefined 
+          ? response.data.totalNaughty 
+          : response.data.data.reduce((sum, state) => sum + state.naughty, 0);
         const allStatesTotal = allStatesNice + allStatesNaughty;
         const allStatesNicePercent = allStatesTotal > 0 ? Math.round((allStatesNice / allStatesTotal) * 100) : 0;
         const allStatesNaughtyPercent = allStatesTotal > 0 ? Math.round((allStatesNaughty / allStatesTotal) * 100) : 0;
@@ -114,8 +118,8 @@ export default function Dashboard() {
 
         setStatePercentageData([allStatesEntry, ...stateData]);
 
-        const totalNice = response.data.data.reduce((sum, state) => sum + state.nice, 0);
-        const totalNaughty = response.data.data.reduce((sum, state) => sum + state.naughty, 0);
+        const totalNice = allStatesNice;
+        const totalNaughty = allStatesNaughty;
         const total = totalNice + totalNaughty;
 
         if (total > 0) {
@@ -464,7 +468,11 @@ export default function Dashboard() {
                         formatter={(value, name, props) => {
                           const isNaughty = name === "Naughty %";
                           const count = isNaughty ? props.payload.naughtyCount : props.payload.niceCount;
-                          return [count, isNaughty ? "Naughty" : "Nice"];
+                          const label = isNaughty ? "Naughty" : "Nice";
+                          return [
+                            count > 0 ? `${value}% (${count})` : `${value}%`,
+                            label,
+                          ];
                         }}
                       />
                       <Legend />
@@ -547,12 +555,26 @@ export default function Dashboard() {
                       <h4 className="font-semibold mb-2 text-sm">{state.state}</h4>
                       <div className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-green-600">Nice</span>
-                          <span className="font-bold">{state.nice}%</span>
+                          <span className="text-green-600 font-medium">Nice</span>
+                          <div className="flex items-center gap-1.5 font-bold">
+                            {state.niceCount > 0 && (
+                              <span className="text-[11px] font-normal text-muted-foreground">
+                                ({state.niceCount})
+                              </span>
+                            )}
+                            <span>{state.nice}%</span>
+                          </div>
                         </div>
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-red-600">Naughty</span>
-                          <span className="font-bold">{state.naughty}%</span>
+                          <span className="text-red-600 font-medium">Naughty</span>
+                          <div className="flex items-center gap-1.5 font-bold">
+                            {state.naughtyCount > 0 && (
+                              <span className="text-[11px] font-normal text-muted-foreground">
+                                ({state.naughtyCount})
+                              </span>
+                            )}
+                            <span>{state.naughty}%</span>
+                          </div>
                         </div>
                       </div>
                     </CardContent>

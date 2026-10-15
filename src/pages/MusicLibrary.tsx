@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,14 +16,35 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Edit, Trash2, Star, X, Upload, Play, Pause, HardDrive, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Edit, Trash2, Star, X, Upload, Play, Pause, HardDrive, ChevronLeft, ChevronRight, AlertCircle, ChevronUp, ChevronDown, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { apiService } from "@/services/api_service";
 import { AudioBook, Category, ApiError } from "@/services/api_types";
+
+// Bauble BLE Specification BAU126426 v2.1.1:
+// 32 audio slots (0–31) in SPI NOR flash
+// Slots 0–7: Dedicated to Santa Behaviour Messages (8 clips)
+// Slot 8: Reserved for Default Audiobook (triggered by physical button)
+// Slots 9–31: Extended / future use
+const SANTA_MESSAGE_SLOTS = Array.from({ length: 8 }, (_, i) => ({
+  slot: i,
+  label: `Slot ${i} — Santa Message ${i + 1}`,
+}));
+
+const EXTENDED_SLOTS = Array.from({ length: 23 }, (_, i) => {
+  const slot = i + 9;
+  return {
+    slot,
+    label: `Slot ${slot} — Extended Slot`,
+  };
+});
 
 const TableRowSkeleton = () => (
   <tr className="animate-pulse border-b">
@@ -109,6 +130,7 @@ export default function MusicLibrary() {
   const [bookTitle, setBookTitle] = useState("");
   const [bookDescription, setBookDescription] = useState("");
   const [bookCategory, setBookCategory] = useState("");
+  const [bookSlotNumber, setBookSlotNumber] = useState("");
   const [bookDuration, setBookDuration] = useState(0);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioFileName, setAudioFileName] = useState("");
@@ -122,8 +144,50 @@ export default function MusicLibrary() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
+   const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<Set<string>>(new Set());
+
+  const toggleDescription = (id: string) => {
+    setExpandedDescriptionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
   const isInitialMount = useRef(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Map of active slots in use by existing messages
+  const usedSlotsMap = useMemo(() => {
+    const map = new Map<number, AudioBook>();
+    audioBooks.forEach((book) => {
+      if (book.index !== undefined && book.index !== null && String(book.index).trim() !== "") {
+        const num = Number(book.index);
+        if (!isNaN(num)) {
+          map.set(num, book);
+        }
+      }
+    });
+    return map;
+  }, [audioBooks]);
+
+  const isSlotInUseByOther = (slot: number) => {
+    const usedBy = usedSlotsMap.get(slot);
+    if (!usedBy) return false;
+    if (editingBook && usedBy._id === editingBook._id) return false;
+    return true;
+  };
+
+  const getSlotUsedByTitle = (slot: number) => {
+    const usedBy = usedSlotsMap.get(slot);
+    if (!usedBy) return null;
+    if (editingBook && usedBy._id === editingBook._id) return null;
+    return usedBy.title;
+  };
 
   useEffect(() => {
     fetchData();
@@ -283,6 +347,11 @@ export default function MusicLibrary() {
       setBookCategory(book.statusCategory._id || "");
       setBookDuration(book.duration);
       setIsFree(book.isFree);
+      const rawSlot =
+        book.index !== undefined && book.index !== null ? String(book.index).trim() : "";
+      const normalizedSlot =
+        rawSlot !== "" && !isNaN(Number(rawSlot)) ? String(Number(rawSlot)) : rawSlot;
+      setBookSlotNumber(normalizedSlot);
       setAudioFile(null);
       setAudioFileName("");
       setIsDialogOpen(true);
@@ -291,6 +360,7 @@ export default function MusicLibrary() {
       setBookTitle("");
       setBookDescription("");
       setBookCategory("");
+      setBookSlotNumber("");
       setBookDuration(0);
       setAudioFileSize(0);
       setIsFree(true);
@@ -336,13 +406,25 @@ export default function MusicLibrary() {
       return;
     }
 
-    if (!bookDescription.trim()) {
-      toast.error("Message description is required");
+    if (!bookCategory) {
+      toast.error("Please select a category");
       return;
     }
 
-    if (!bookCategory) {
-      toast.error("Please select a category");
+    const trimmedSlot = bookSlotNumber.trim();
+    if (!trimmedSlot) {
+      toast.error("Please select a Bauble slot number");
+      return;
+    }
+
+    const slotNum = Number(trimmedSlot);
+    if (isNaN(slotNum) || slotNum < 0 || slotNum > 31) {
+      toast.error("Bauble slot must be an integer between 0 and 31 (0–7 for Santa messages)");
+      return;
+    }
+
+    if (!bookDescription.trim()) {
+      toast.error("Message description is required");
       return;
     }
 
@@ -360,6 +442,7 @@ export default function MusicLibrary() {
           description: bookDescription,
           statusCategory: bookCategory,
           isFree: isFree,
+          index: trimmedSlot,
         };
 
         if (audioFile) {
@@ -389,6 +472,7 @@ export default function MusicLibrary() {
           fileSize: audioFileSize,
           musicFile: audioFile,
           isFree: isFree,
+          index: trimmedSlot,
         };
 
         const response = await apiService.createAudioBook(createData);
@@ -412,6 +496,7 @@ export default function MusicLibrary() {
     setBookTitle("");
     setBookDescription("");
     setBookCategory("");
+    setBookSlotNumber("");
     setBookDuration(0);
     setAudioFileSize(0);
     setIsFree(true);
@@ -518,13 +603,14 @@ export default function MusicLibrary() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-muted/50">
-                <tr className="border-b">
-                  <th className="px-4 py-3 text-left font-medium w-[200px]">Title</th>
-                  <th className="px-4 py-3 text-left font-medium w-[80px]">Type</th>
-                  <th className="px-4 py-3 text-left font-medium w-[120px]">Category</th>
-                  <th className="px-4 py-3 text-left font-medium w-[100px]">Duration</th>
-                  <th className="px-4 py-3 text-left font-medium">Description</th>
-                  <th className="px-4 py-3 text-right font-medium w-[180px]">Actions</th>
+                <tr className="border-b text-xs uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-2.5 text-left font-semibold w-[200px]">Title</th>
+                  <th className="px-4 py-2.5 text-left font-semibold w-[75px]">Slot</th>
+                  <th className="px-4 py-2.5 text-left font-semibold w-[75px]">Type</th>
+                  <th className="px-4 py-2.5 text-left font-semibold min-w-[140px]">Category</th>
+                  <th className="px-4 py-2.5 text-left font-semibold w-[85px]">Duration</th>
+                  <th className="px-4 py-2.5 text-left font-semibold">Description</th>
+                  <th className="px-4 py-2.5 text-right font-semibold w-[160px]">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -539,81 +625,133 @@ export default function MusicLibrary() {
                     </td>
                   </tr>
                 ) : (
-                  audioBooks.map((book) => (
-                    <tr key={book._id} className="border-b hover:bg-muted/50">
-                      <td className="px-4 py-3 font-medium">{book.title}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant={book.isFree ? "secondary" : "default"}>
-                          {book.isFree ? "Free" : "Paid"}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge
-                          style={{
-                            backgroundColor: `${book.statusCategory.color}20`,
-                            color: book.statusCategory.color,
-                            border: `1.5px solid ${book.statusCategory.color}60`
-                          }}
-                          className="font-bold rounded-full px-3 py-1.5"
-                        >
-                          <div className="flex items-center justify-center gap-2">
-                            <div
-                              className="w-2 h-2 rounded-full animate-pulse flex-shrink-0"
-                              style={{ backgroundColor: book.statusCategory.color }}
-                            />
-                            <span>{book.statusCategory.name}</span>
-                          </div>
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">{formatDuration(book.duration)}</td>
-                      {/* <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {formatFileSize(book.fileSize || 0)}
-                      </td> */}
-                      <td className="px-4 py-3">
-                        <div className="max-w-md line-clamp-2">{book.description}</div>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex gap-2 justify-end">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handlePlayPause(book)}
-                            title="Preview"
-                          >
-                            {playingAudioId === book._id ? (
-                              <Pause className="h-4 w-4" />
+                  audioBooks.map((book) => {
+                    const isExpanded = expandedDescriptionIds.has(book._id);
+                    return (
+                      <React.Fragment key={book._id}>
+                        <tr className="border-b hover:bg-muted/40 transition-colors">
+                          <td className="px-4 py-2.5 font-medium text-sm">{book.title}</td>
+                          <td className="px-4 py-2.5">
+                            {book.index !== undefined && book.index !== null && String(book.index).trim() !== "" ? (
+                              <Badge variant="outline" className="font-mono text-xs font-semibold">
+                                {book.index}
+                              </Badge>
                             ) : (
-                              <Play className="h-4 w-4" />
+                              <span className="text-muted-foreground">-</span>
                             )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleSetDefault(book._id)}
-                            title="Set as default"
-                          >
-                            <Star className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenDialog(book)}
-                            title="Edit"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenDeleteDialog(book)}
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <Badge variant={book.isFree ? "secondary" : "default"} className="text-xs">
+                              {book.isFree ? "Free" : "Paid"}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <Badge
+                              style={{
+                                backgroundColor: `${book.statusCategory.color}20`,
+                                color: book.statusCategory.color,
+                                border: `1.5px solid ${book.statusCategory.color}60`
+                              }}
+                              className="font-medium rounded-full px-2.5 py-1 whitespace-nowrap text-xs"
+                            >
+                              <div className="flex items-center justify-center gap-1.5">
+                                <div
+                                  className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0"
+                                  style={{ backgroundColor: book.statusCategory.color }}
+                                />
+                                <span>{book.statusCategory.name}</span>
+                              </div>
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-2.5 text-sm">{formatDuration(book.duration)}</td>
+                          <td className="px-4 py-2.5">
+                            <button
+                              type="button"
+                              onClick={() => toggleDescription(book._id)}
+                              className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors py-1 px-2.5 rounded-md hover:bg-muted border border-border/50 bg-background/60 shadow-xs"
+                              title="Click to toggle description"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-primary" />
+                              <span>{isExpanded ? "Hide Description" : "View Description"}</span>
+                              {isExpanded ? (
+                                <ChevronUp className="w-3 h-3 text-muted-foreground" />
+                              ) : (
+                                <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                              )}
+                            </button>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <div className="flex gap-1 justify-end">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                onClick={() => handlePlayPause(book)}
+                                title="Preview"
+                              >
+                                {playingAudioId === book._id ? (
+                                  <Pause className="h-4 w-4" />
+                                ) : (
+                                  <Play className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                onClick={() => handleSetDefault(book._id)}
+                                title="Set as default"
+                              >
+                                <Star className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                onClick={() => handleOpenDialog(book)}
+                                title="Edit"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => handleOpenDeleteDialog(book)}
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr className="bg-muted/20 border-b">
+                            <td colSpan={7} className="px-6 py-3">
+                              <div className="bg-background rounded-lg border border-border/80 p-3.5 shadow-sm max-w-3xl space-y-1">
+                                <div className="flex items-center justify-between text-xs font-semibold text-foreground">
+                                  <span className="flex items-center gap-1.5 text-primary">
+                                    <FileText className="w-3.5 h-3.5" />
+                                    Description / Message Script &bull; {book.title}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleDescription(book._id)}
+                                    className="text-muted-foreground hover:text-foreground text-xs font-normal underline"
+                                  >
+                                    Close
+                                  </button>
+                                </div>
+                                <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed pt-1">
+                                  {book.description || "No description provided."}
+                                </p>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -676,11 +814,10 @@ export default function MusicLibrary() {
                           key={p}
                           variant={p === currentPage ? "default" : "outline"}
                           size="icon"
-                          className={`h-9 w-9 rounded-lg font-medium transition-colors ${
-                            p === currentPage
-                              ? "bg-primary text-primary-foreground hover:bg-primary/90 border-transparent shadow-sm"
-                              : "border border-border bg-background hover:bg-muted text-foreground"
-                          }`}
+                          className={`h-9 w-9 rounded-lg font-medium transition-colors ${p === currentPage
+                            ? "bg-primary text-primary-foreground hover:bg-primary/90 border-transparent shadow-sm"
+                            : "border border-border bg-background hover:bg-muted text-foreground"
+                            }`}
                           onClick={() => setCurrentPage(p)}
                         >
                           {p}
@@ -741,6 +878,104 @@ export default function MusicLibrary() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="slotNumber">Bauble Slot Number</Label>
+                <span className="text-xs text-muted-foreground">
+                  Hardware Flash: 0–31 (32 slots)
+                </span>
+              </div>
+              <Select
+                value={bookSlotNumber}
+                onValueChange={setBookSlotNumber}
+                disabled={isSaving}
+              >
+                <SelectTrigger id="slotNumber" className="w-full">
+                  <SelectValue placeholder="Select Bauble hardware slot" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectGroup>
+                    <SelectLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Standard Santa Messages (Slots 0 – 7)
+                    </SelectLabel>
+                    {SANTA_MESSAGE_SLOTS.map(({ slot, label }) => {
+                      const inUse = isSlotInUseByOther(slot);
+                      const usedTitle = getSlotUsedByTitle(slot);
+                      return (
+                        <SelectItem key={slot} value={String(slot)}>
+                          <div className="flex items-center justify-between w-full gap-3">
+                            <span>{label}</span>
+                            {inUse ? (
+                              <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded font-normal">
+                                In use: {usedTitle}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded font-normal">
+                                Available
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectGroup>
+
+                  <SelectSeparator />
+
+                  <SelectGroup>
+                    <SelectLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Special / Reserved
+                    </SelectLabel>
+                    <SelectItem value="8" disabled className="opacity-60 cursor-not-allowed">
+                      <div className="flex items-center justify-between w-full gap-3">
+                        <span>Slot 8 — Reserved for Audiobook (Physical Button)</span>
+                        <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded font-normal">
+                          Audiobook
+                        </span>
+                      </div>
+                    </SelectItem>
+                  </SelectGroup>
+
+                  <SelectSeparator />
+
+                  <SelectGroup>
+                    <SelectLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Extended Audio Slots (Slots 9 – 31)
+                    </SelectLabel>
+                    {EXTENDED_SLOTS.map(({ slot, label }) => {
+                      const inUse = isSlotInUseByOther(slot);
+                      const usedTitle = getSlotUsedByTitle(slot);
+                      return (
+                        <SelectItem key={slot} value={String(slot)}>
+                          <div className="flex items-center justify-between w-full gap-3">
+                            <span>{label}</span>
+                            {inUse ? (
+                              <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded font-normal">
+                                In use: {usedTitle}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded font-normal">
+                                Available
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+
+              {bookSlotNumber && isSlotInUseByOther(Number(bookSlotNumber)) && (
+                <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 p-2.5 rounded-md border border-amber-200 dark:border-amber-900/50">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Slot Conflict Warning:</strong> Slot {bookSlotNumber} is currently assigned to &ldquo;{getSlotUsedByTitle(Number(bookSlotNumber))}&rdquo;. Each slot on the Bauble flash should be unique to avoid audio playback conflicts.
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="grid gap-2">

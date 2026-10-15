@@ -204,6 +204,7 @@ export interface AudioBook {
     duration: number;
     musicFile: string;
     isFree: boolean;
+    index?: number | string;
     createdAt: string;
     updatedAt?: string;
     __v?: number;
@@ -216,6 +217,7 @@ export interface CreateAudioBookRequest {
     duration: number;
     musicFile: File;
     isFree: boolean;
+    index?: number | string;
 }
 
 export interface UpdateAudioBookRequest {
@@ -225,6 +227,7 @@ export interface UpdateAudioBookRequest {
     duration?: number;
     musicFile?: File;
     isFree?: boolean;
+    index?: number | string;
 }
 
 export interface CreateAudioBookResponse {

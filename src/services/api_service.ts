@@ -237,6 +237,9 @@ class ApiService {
         formData.append('duration', data.duration.toString());
         formData.append('musicFile', data.musicFile);
         formData.append('isFree', data.isFree.toString());
+        if (data.index !== undefined && data.index !== null && data.index !== '') {
+            formData.append('index', data.index.toString());
+        }
 
         return this.axiosInstance.post<any, CreateAudioBookResponse>(
             API_ENDPOINTS.MUSIC.CREATE,
@@ -258,6 +261,9 @@ class ApiService {
         if (data.duration !== undefined) formData.append('duration', data.duration.toString());
         if (data.musicFile !== undefined) formData.append('musicFile', data.musicFile);
         if (data.isFree !== undefined) formData.append('isFree', data.isFree.toString());
+        if (data.index !== undefined && data.index !== null && data.index !== '') {
+            formData.append('index', data.index.toString());
+        }
 
         return this.axiosInstance.put<any, UpdateAudioBookResponse>(
             API_ENDPOINTS.MUSIC.UPDATE(id),

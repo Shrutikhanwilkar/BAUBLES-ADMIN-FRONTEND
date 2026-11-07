@@ -84,17 +84,17 @@ export default function Dashboard() {
       setStateLoading(true);
       const response = await apiService.getStateReport();
       if (response.success) {
-        const allStatesNice = response.data.totalNice !== undefined 
-          ? response.data.totalNice 
-          : response.data.data.reduce((sum, state) => sum + state.nice, 0);
-        const allStatesNaughty = response.data.totalNaughty !== undefined 
-          ? response.data.totalNaughty 
-          : response.data.data.reduce((sum, state) => sum + state.naughty, 0);
+        const filteredStates = response.data.data.filter(
+          (state) => !["other", "others", "unknown"].includes(state.state.trim().toLowerCase())
+        );
+
+        const allStatesNice = filteredStates.reduce((sum, state) => sum + state.nice, 0);
+        const allStatesNaughty = filteredStates.reduce((sum, state) => sum + state.naughty, 0);
         const allStatesTotal = allStatesNice + allStatesNaughty;
         const allStatesNicePercent = allStatesTotal > 0 ? Math.round((allStatesNice / allStatesTotal) * 100) : 0;
         const allStatesNaughtyPercent = allStatesTotal > 0 ? Math.round((allStatesNaughty / allStatesTotal) * 100) : 0;
 
-        const stateData = response.data.data.map((state) => {
+        const stateData = filteredStates.map((state) => {
           const total = state.nice + state.naughty;
           const nicePercent = total > 0 ? Math.round((state.nice / total) * 100) : 0;
           const naughtyPercent = total > 0 ? Math.round((state.naughty / total) * 100) : 0;
@@ -212,28 +212,15 @@ export default function Dashboard() {
 
   const stateChartData = stats?.stateCounts
     ? (() => {
-      const entries = Object.entries(stats.stateCounts).map(([name, value], index) => ({
-        name,
-        value,
-        color: STATE_COLORS[index % STATE_COLORS.length],
-      }));
+      const entries = Object.entries(stats.stateCounts)
+        .filter(([name]) => !["other", "others", "unknown"].includes(name.trim().toLowerCase()))
+        .map(([name, value], index) => ({
+          name,
+          value,
+          color: STATE_COLORS[index % STATE_COLORS.length],
+        }));
 
-      const totalValue = entries.reduce((sum, entry) => sum + entry.value, 0);
-      const otherThreshold = totalValue * 0.05;
-
-      const mainEntries = entries.filter(entry => entry.value >= otherThreshold);
-      const otherEntries = entries.filter(entry => entry.value < otherThreshold);
-
-      if (otherEntries.length > 0) {
-        const otherValue = otherEntries.reduce((sum, entry) => sum + entry.value, 0);
-        mainEntries.push({
-          name: "Other",
-          value: otherValue,
-          color: STATE_COLORS[mainEntries.length % STATE_COLORS.length],
-        });
-      }
-
-      return mainEntries;
+      return entries;
     })()
     : [];
 

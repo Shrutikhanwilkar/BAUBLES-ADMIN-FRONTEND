@@ -230,7 +230,11 @@ export default function Reports() {
       setStateLoading(true);
       const response = await apiService.getStateReport();
       if (response.success) {
-        const stateData = response.data.data.map((state) => {
+        const filteredStates = response.data.data.filter(
+          (state) => !["other", "others", "unknown"].includes(state.state.trim().toLowerCase())
+        );
+
+        const stateData = filteredStates.map((state) => {
           const total = state.nice + state.naughty;
           const nicePercent = total > 0 ? Math.round((state.nice / total) * 100) : 0;
           const naughtyPercent = total > 0 ? Math.round((state.naughty / total) * 100) : 0;

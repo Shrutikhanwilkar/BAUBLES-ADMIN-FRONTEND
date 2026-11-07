@@ -233,7 +233,12 @@ export default function VersionControl() {
     return (
         <div className="space-y-6 animate-fade-in">
             <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold">Version Control</h1>
+                <div>
+                    <h1 className="text-3xl font-bold">Version Control</h1>
+                    <p className="text-sm text-muted-foreground italic mt-0.5">
+                        A Product of Naughty & Nice
+                    </p>
+                </div>
                 <Button onClick={handleOpenDialog} disabled={isLoading}>
                     <Edit className="mr-2 h-4 w-4" />
                     Update Version
@@ -309,6 +314,11 @@ export default function VersionControl() {
                                             <p className="font-medium">{formatDate(currentVersion.createdAt)}</p>
                                         </div>
                                     </div>
+                                </div>
+
+                                <div className="mt-6 pt-4 border-t flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>Mobile Application Release</span>
+                                    <span className="italic">A Product of Naughty & Nice</span>
                                 </div>
                             </CardContent>
                         </Card>

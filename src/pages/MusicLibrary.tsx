@@ -16,14 +16,11 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Edit, Trash2, Star, X, Upload, Play, Pause, HardDrive, ChevronLeft, ChevronRight, AlertCircle, ChevronUp, ChevronDown, FileText } from "lucide-react";
+import { Plus, Edit, Trash2, Star, X, Upload, Play, Pause, HardDrive, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { apiService } from "@/services/api_service";
 import { AudioBook, Category, ApiError } from "@/services/api_types";
@@ -33,26 +30,23 @@ import { AudioBook, Category, ApiError } from "@/services/api_types";
 // Slots 0–7: Dedicated to Santa Behaviour Messages (8 clips)
 // Slot 8: Reserved for Default Audiobook (triggered by physical button)
 // Slots 9–31: Extended / future use
-const SANTA_MESSAGE_SLOTS = Array.from({ length: 8 }, (_, i) => ({
-  slot: i,
-  label: `Slot ${i} — Santa Message ${i + 1}`,
-}));
 
-const EXTENDED_SLOTS = Array.from({ length: 23 }, (_, i) => {
-  const slot = i + 9;
-  return {
-    slot,
-    label: `Slot ${slot} — Extended Slot`,
-  };
-});
+// Finds the lowest available flash slot. Prioritizes Santa message slots 0–7,
+// then extended slots 9–31. Slot 8 is reserved for the audiobook physical button.
+const findNextAvailableSlot = (occupiedSet: Set<number>): number | null => {
+  for (let slot = 0; slot <= 7; slot++) {
+    if (!occupiedSet.has(slot)) return slot;
+  }
+  for (let slot = 9; slot <= 31; slot++) {
+    if (!occupiedSet.has(slot)) return slot;
+  }
+  return null;
+};
 
 const TableRowSkeleton = () => (
   <tr className="animate-pulse border-b">
     <td className="px-4 py-3">
       <div className="h-5 w-32 bg-muted/80 rounded"></div>
-    </td>
-    <td className="px-4 py-3">
-      <div className="h-6 w-20 bg-muted/80 rounded"></div>
     </td>
     <td className="px-4 py-3">
       <div className="h-6 w-16 bg-muted/80 rounded"></div>
@@ -161,32 +155,34 @@ export default function MusicLibrary() {
   const isInitialMount = useRef(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Map of active slots in use by existing messages
-  const usedSlotsMap = useMemo(() => {
-    const map = new Map<number, AudioBook>();
-    audioBooks.forEach((book) => {
+  // All audiobooks across all pages to reliably detect occupied hardware slots
+  const [allAudioBooks, setAllAudioBooks] = useState<AudioBook[]>([]);
+
+  const fetchAllAudioBooksForSlots = async () => {
+    try {
+      const res = await apiService.getAudioBooks({ page: 1, limit: 1000 });
+      if (res.success && res.data.music) {
+        setAllAudioBooks(res.data.music);
+        return res.data.music;
+      }
+    } catch {
+      // Fallback
+    }
+    return [];
+  };
+
+  const getOccupiedSlots = (books: AudioBook[], excludeBookId?: string): Set<number> => {
+    const set = new Set<number>();
+    books.forEach((book) => {
+      if (excludeBookId && book._id === excludeBookId) return;
       if (book.index !== undefined && book.index !== null && String(book.index).trim() !== "") {
         const num = Number(book.index);
         if (!isNaN(num)) {
-          map.set(num, book);
+          set.add(num);
         }
       }
     });
-    return map;
-  }, [audioBooks]);
-
-  const isSlotInUseByOther = (slot: number) => {
-    const usedBy = usedSlotsMap.get(slot);
-    if (!usedBy) return false;
-    if (editingBook && usedBy._id === editingBook._id) return false;
-    return true;
-  };
-
-  const getSlotUsedByTitle = (slot: number) => {
-    const usedBy = usedSlotsMap.get(slot);
-    if (!usedBy) return null;
-    if (editingBook && usedBy._id === editingBook._id) return null;
-    return usedBy.title;
+    return set;
   };
 
   useEffect(() => {
@@ -203,13 +199,18 @@ export default function MusicLibrary() {
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const [categoriesResponse, audioBooksResponse] = await Promise.all([
+      const [categoriesResponse, audioBooksResponse, allAudioBooksResponse] = await Promise.all([
         apiService.getCategories(),
         apiService.getAudioBooks({ page: currentPage, limit: pageLimit }),
+        apiService.getAudioBooks({ page: 1, limit: 1000 }).catch(() => null),
       ]);
 
       if (categoriesResponse.success) {
         setCategories(categoriesResponse.data);
+      }
+
+      if (allAudioBooksResponse && allAudioBooksResponse.success && allAudioBooksResponse.data.music) {
+        setAllAudioBooks(allAudioBooksResponse.data.music);
       }
 
       if (audioBooksResponse.success) {
@@ -233,6 +234,16 @@ export default function MusicLibrary() {
   const fetchAudioBooks = async () => {
     try {
       setIsLoading(true);
+      // Refresh all audiobooks in the background to keep occupied slots up to date
+      apiService
+        .getAudioBooks({ page: 1, limit: 1000 })
+        .then((res) => {
+          if (res.success && res.data.music) {
+            setAllAudioBooks(res.data.music);
+          }
+        })
+        .catch(() => {});
+
       const params: any = {
         page: currentPage,
         limit: pageLimit === -1 ? 1000 : pageLimit,
@@ -339,7 +350,13 @@ export default function MusicLibrary() {
     }
   };
 
-  const handleOpenDialog = (book: AudioBook | null = null) => {
+  const handleOpenDialog = async (book: AudioBook | null = null) => {
+    let sourceList = allAudioBooks.length > 0 ? allAudioBooks : audioBooks;
+    if (allAudioBooks.length === 0) {
+      const fresh = await fetchAllAudioBooksForSlots();
+      if (fresh && fresh.length > 0) sourceList = fresh;
+    }
+
     if (book) {
       setEditingBook(book);
       setBookTitle(book.title);
@@ -349,9 +366,14 @@ export default function MusicLibrary() {
       setIsFree(book.isFree);
       const rawSlot =
         book.index !== undefined && book.index !== null ? String(book.index).trim() : "";
-      const normalizedSlot =
-        rawSlot !== "" && !isNaN(Number(rawSlot)) ? String(Number(rawSlot)) : rawSlot;
-      setBookSlotNumber(normalizedSlot);
+      let slotToUse =
+        rawSlot !== "" && !isNaN(Number(rawSlot)) ? String(Number(rawSlot)) : "";
+      if (slotToUse === "") {
+        const occupied = getOccupiedSlots(sourceList, book._id);
+        const nextSlot = findNextAvailableSlot(occupied);
+        slotToUse = nextSlot !== null ? String(nextSlot) : "";
+      }
+      setBookSlotNumber(slotToUse);
       setAudioFile(null);
       setAudioFileName("");
       setIsDialogOpen(true);
@@ -360,7 +382,13 @@ export default function MusicLibrary() {
       setBookTitle("");
       setBookDescription("");
       setBookCategory("");
-      setBookSlotNumber("");
+      const occupied = getOccupiedSlots(sourceList);
+      const nextSlot = findNextAvailableSlot(occupied);
+      if (nextSlot === null) {
+        toast.error("All 31 Bauble flash memory slots are occupied. Please delete an existing message first.");
+        return;
+      }
+      setBookSlotNumber(String(nextSlot));
       setBookDuration(0);
       setAudioFileSize(0);
       setIsFree(true);
@@ -413,7 +441,7 @@ export default function MusicLibrary() {
 
     const trimmedSlot = bookSlotNumber.trim();
     if (!trimmedSlot) {
-      toast.error("Please select a Bauble slot number");
+      toast.error("No Bauble hardware slot is currently available. Flash memory is full.");
       return;
     }
 
@@ -605,7 +633,6 @@ export default function MusicLibrary() {
               <thead className="bg-muted/50">
                 <tr className="border-b text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="px-4 py-2.5 text-left font-semibold w-[200px]">Title</th>
-                  <th className="px-4 py-2.5 text-left font-semibold w-[75px]">Slot</th>
                   <th className="px-4 py-2.5 text-left font-semibold w-[75px]">Type</th>
                   <th className="px-4 py-2.5 text-left font-semibold min-w-[140px]">Category</th>
                   <th className="px-4 py-2.5 text-left font-semibold w-[85px]">Duration</th>
@@ -620,7 +647,7 @@ export default function MusicLibrary() {
                   ))
                 ) : audioBooks.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                       No messages found
                     </td>
                   </tr>
@@ -631,15 +658,6 @@ export default function MusicLibrary() {
                       <React.Fragment key={book._id}>
                         <tr className="border-b hover:bg-muted/40 transition-colors">
                           <td className="px-4 py-2.5 font-medium text-sm">{book.title}</td>
-                          <td className="px-4 py-2.5">
-                            {book.index !== undefined && book.index !== null && String(book.index).trim() !== "" ? (
-                              <Badge variant="outline" className="font-mono text-xs font-semibold">
-                                {book.index}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </td>
                           <td className="px-4 py-2.5">
                             <Badge variant={book.isFree ? "secondary" : "default"} className="text-xs">
                               {book.isFree ? "Free" : "Paid"}
@@ -727,7 +745,7 @@ export default function MusicLibrary() {
                         </tr>
                         {isExpanded && (
                           <tr className="bg-muted/20 border-b">
-                            <td colSpan={7} className="px-6 py-3">
+                            <td colSpan={6} className="px-6 py-3">
                               <div className="bg-background rounded-lg border border-border/80 p-3.5 shadow-sm max-w-3xl space-y-1">
                                 <div className="flex items-center justify-between text-xs font-semibold text-foreground">
                                   <span className="flex items-center gap-1.5 text-primary">
@@ -878,104 +896,6 @@ export default function MusicLibrary() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="slotNumber">Bauble Slot Number</Label>
-                <span className="text-xs text-muted-foreground">
-                  Hardware Flash: 0–31 (32 slots)
-                </span>
-              </div>
-              <Select
-                value={bookSlotNumber}
-                onValueChange={setBookSlotNumber}
-                disabled={isSaving}
-              >
-                <SelectTrigger id="slotNumber" className="w-full">
-                  <SelectValue placeholder="Select Bauble hardware slot" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  <SelectGroup>
-                    <SelectLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Standard Santa Messages (Slots 0 – 7)
-                    </SelectLabel>
-                    {SANTA_MESSAGE_SLOTS.map(({ slot, label }) => {
-                      const inUse = isSlotInUseByOther(slot);
-                      const usedTitle = getSlotUsedByTitle(slot);
-                      return (
-                        <SelectItem key={slot} value={String(slot)}>
-                          <div className="flex items-center justify-between w-full gap-3">
-                            <span>{label}</span>
-                            {inUse ? (
-                              <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded font-normal">
-                                In use: {usedTitle}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded font-normal">
-                                Available
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectGroup>
-
-                  <SelectSeparator />
-
-                  <SelectGroup>
-                    <SelectLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Special / Reserved
-                    </SelectLabel>
-                    <SelectItem value="8" disabled className="opacity-60 cursor-not-allowed">
-                      <div className="flex items-center justify-between w-full gap-3">
-                        <span>Slot 8 — Reserved for Audiobook (Physical Button)</span>
-                        <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded font-normal">
-                          Audiobook
-                        </span>
-                      </div>
-                    </SelectItem>
-                  </SelectGroup>
-
-                  <SelectSeparator />
-
-                  <SelectGroup>
-                    <SelectLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Extended Audio Slots (Slots 9 – 31)
-                    </SelectLabel>
-                    {EXTENDED_SLOTS.map(({ slot, label }) => {
-                      const inUse = isSlotInUseByOther(slot);
-                      const usedTitle = getSlotUsedByTitle(slot);
-                      return (
-                        <SelectItem key={slot} value={String(slot)}>
-                          <div className="flex items-center justify-between w-full gap-3">
-                            <span>{label}</span>
-                            {inUse ? (
-                              <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded font-normal">
-                                In use: {usedTitle}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded font-normal">
-                                Available
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-
-              {bookSlotNumber && isSlotInUseByOther(Number(bookSlotNumber)) && (
-                <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 p-2.5 rounded-md border border-amber-200 dark:border-amber-900/50">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Slot Conflict Warning:</strong> Slot {bookSlotNumber} is currently assigned to &ldquo;{getSlotUsedByTitle(Number(bookSlotNumber))}&rdquo;. Each slot on the Bauble flash should be unique to avoid audio playback conflicts.
-                  </span>
-                </div>
-              )}
             </div>
 
             <div className="grid gap-2">
